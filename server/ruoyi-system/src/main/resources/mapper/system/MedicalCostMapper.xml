@@ -1,0 +1,211 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.system.mapper.MedicalCostMapper">
+    
+    <resultMap type="MedicalCost" id="MedicalCostResult">
+        <result property="id"    column="id"    />
+        <result property="serviceId"    column="service_id"    />
+        <result property="totalCost"    column="total_cost"    />
+        <result property="drugCost"    column="drug_cost"    />
+        <result property="treatmentCost"    column="treatment_cost"    />
+        <result property="surgeryCost"    column="surgery_cost"    />
+        <result property="inspectionCost"    column="inspection_cost"    />
+        <result property="laboratoryCost"    column="laboratory_cost"    />
+        <result property="bedCost"    column="bed_cost"    />
+        <result property="nursingCost"    column="nursing_cost"    />
+        <result property="otherCost"    column="other_cost"    />
+        <result property="insurancePaid"    column="insurance_paid"    />
+        <result property="selfPaid"    column="self_paid"    />
+        <result property="costCategory"    column="cost_category"    />
+        <result property="createdAt"    column="created_at"    />
+    </resultMap>
+
+    <sql id="selectMedicalCostVo">
+        select id, service_id, total_cost, drug_cost, treatment_cost, surgery_cost, inspection_cost, laboratory_cost, bed_cost, nursing_cost, other_cost, insurance_paid, self_paid, cost_category, created_at from medical_cost
+    </sql>
+
+    <select id="selectMedicalCostList" parameterType="MedicalCost" resultMap="MedicalCostResult">
+        <include refid="selectMedicalCostVo"/>
+        <where>  
+            <if test="serviceId != null "> and service_id = #{serviceId}</if>
+            <if test="totalCost != null "> and total_cost = #{totalCost}</if>
+            <if test="drugCost != null "> and drug_cost = #{drugCost}</if>
+            <if test="treatmentCost != null "> and treatment_cost = #{treatmentCost}</if>
+            <if test="surgeryCost != null "> and surgery_cost = #{surgeryCost}</if>
+            <if test="inspectionCost != null "> and inspection_cost = #{inspectionCost}</if>
+            <if test="laboratoryCost != null "> and laboratory_cost = #{laboratoryCost}</if>
+            <if test="bedCost != null "> and bed_cost = #{bedCost}</if>
+            <if test="nursingCost != null "> and nursing_cost = #{nursingCost}</if>
+            <if test="otherCost != null "> and other_cost = #{otherCost}</if>
+            <if test="insurancePaid != null "> and insurance_paid = #{insurancePaid}</if>
+            <if test="selfPaid != null "> and self_paid = #{selfPaid}</if>
+            <if test="costCategory != null  and costCategory != ''"> and cost_category = #{costCategory}</if>
+            <if test="createdAt != null "> and created_at = #{createdAt}</if>
+        </where>
+    </select>
+    
+    <select id="selectMedicalCostById" parameterType="Long" resultMap="MedicalCostResult">
+        <include refid="selectMedicalCostVo"/>
+        where id = #{id}
+    </select>
+
+    <insert id="insertMedicalCost" parameterType="MedicalCost" useGeneratedKeys="true" keyProperty="id">
+        insert into medical_cost
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="serviceId != null">service_id,</if>
+            <if test="totalCost != null">total_cost,</if>
+            <if test="drugCost != null">drug_cost,</if>
+            <if test="treatmentCost != null">treatment_cost,</if>
+            <if test="surgeryCost != null">surgery_cost,</if>
+            <if test="inspectionCost != null">inspection_cost,</if>
+            <if test="laboratoryCost != null">laboratory_cost,</if>
+            <if test="bedCost != null">bed_cost,</if>
+            <if test="nursingCost != null">nursing_cost,</if>
+            <if test="otherCost != null">other_cost,</if>
+            <if test="insurancePaid != null">insurance_paid,</if>
+            <if test="selfPaid != null">self_paid,</if>
+            <if test="costCategory != null">cost_category,</if>
+            <if test="createdAt != null">created_at,</if>
+         </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="serviceId != null">#{serviceId},</if>
+            <if test="totalCost != null">#{totalCost},</if>
+            <if test="drugCost != null">#{drugCost},</if>
+            <if test="treatmentCost != null">#{treatmentCost},</if>
+            <if test="surgeryCost != null">#{surgeryCost},</if>
+            <if test="inspectionCost != null">#{inspectionCost},</if>
+            <if test="laboratoryCost != null">#{laboratoryCost},</if>
+            <if test="bedCost != null">#{bedCost},</if>
+            <if test="nursingCost != null">#{nursingCost},</if>
+            <if test="otherCost != null">#{otherCost},</if>
+            <if test="insurancePaid != null">#{insurancePaid},</if>
+            <if test="selfPaid != null">#{selfPaid},</if>
+            <if test="costCategory != null">#{costCategory},</if>
+            <if test="createdAt != null">#{createdAt},</if>
+         </trim>
+    </insert>
+
+    <update id="updateMedicalCost" parameterType="MedicalCost">
+        update medical_cost
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="serviceId != null">service_id = #{serviceId},</if>
+            <if test="totalCost != null">total_cost = #{totalCost},</if>
+            <if test="drugCost != null">drug_cost = #{drugCost},</if>
+            <if test="treatmentCost != null">treatment_cost = #{treatmentCost},</if>
+            <if test="surgeryCost != null">surgery_cost = #{surgeryCost},</if>
+            <if test="inspectionCost != null">inspection_cost = #{inspectionCost},</if>
+            <if test="laboratoryCost != null">laboratory_cost = #{laboratoryCost},</if>
+            <if test="bedCost != null">bed_cost = #{bedCost},</if>
+            <if test="nursingCost != null">nursing_cost = #{nursingCost},</if>
+            <if test="otherCost != null">other_cost = #{otherCost},</if>
+            <if test="insurancePaid != null">insurance_paid = #{insurancePaid},</if>
+            <if test="selfPaid != null">self_paid = #{selfPaid},</if>
+            <if test="costCategory != null">cost_category = #{costCategory},</if>
+            <if test="createdAt != null">created_at = #{createdAt},</if>
+        </trim>
+        where id = #{id}
+    </update>
+
+    <delete id="deleteMedicalCostById" parameterType="Long">
+        delete from medical_cost where id = #{id}
+    </delete>
+
+    <delete id="deleteMedicalCostByIds" parameterType="String">
+        delete from medical_cost where id in 
+        <foreach item="id" collection="array" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </delete>
+
+    <!-- ====== 统计分析查询 ====== -->
+
+    <!-- 费用总览 -->
+    <select id="selectCostSummary" resultType="java.util.Map">
+        select
+            coalesce(sum(total_cost), 0) as totalCost,
+            coalesce(avg(total_cost), 0) as avgCost,
+            coalesce(sum(insurance_paid), 0) as totalInsurancePaid,
+            coalesce(sum(self_paid), 0) as totalSelfPaid,
+            count(*) as totalRecords
+        from medical_cost c
+        join medical_service s on c.service_id = s.id
+        <where>
+            <if test="orgId != null"> and s.org_id = #{orgId} </if>
+            <if test="year != null"> and year(s.service_date) = #{year} </if>
+        </where>
+    </select>
+
+    <!-- 费用构成分析 -->
+    <select id="selectCostComposition" resultType="java.util.Map">
+        select
+            coalesce(sum(drug_cost), 0) as drugCost,
+            coalesce(sum(treatment_cost), 0) as treatmentCost,
+            coalesce(sum(surgery_cost), 0) as surgeryCost,
+            coalesce(sum(inspection_cost), 0) as inspectionCost,
+            coalesce(sum(laboratory_cost), 0) as laboratoryCost,
+            coalesce(sum(bed_cost), 0) as bedCost,
+            coalesce(sum(nursing_cost), 0) as nursingCost,
+            coalesce(sum(other_cost), 0) as otherCost
+        from medical_cost c
+        join medical_service s on c.service_id = s.id
+        <where>
+            <if test="orgId != null"> and s.org_id = #{orgId} </if>
+            <if test="year != null"> and year(s.service_date) = #{year} </if>
+        </where>
+    </select>
+
+    <!-- 医保费用分析 -->
+    <select id="selectInsuranceAnalysis" resultType="java.util.Map">
+        select cost_category as name,
+            coalesce(sum(total_cost), 0) as totalCost,
+            coalesce(sum(insurance_paid), 0) as insurancePaid,
+            coalesce(sum(self_paid), 0) as selfPaid
+        from medical_cost c
+        join medical_service s on c.service_id = s.id
+        where cost_category is not null and cost_category != ''
+        <if test="orgId != null"> and s.org_id = #{orgId} </if>
+        <if test="year != null"> and year(s.service_date) = #{year} </if>
+        group by cost_category
+    </select>
+
+    <!-- 次均费用趋势 -->
+    <select id="selectAvgCostTrend" resultType="java.util.Map">
+        select
+            date_format(s.service_date, '%Y-%m') as month,
+            round(avg(c.total_cost), 2) as avgCost
+        from medical_cost c
+        join medical_service s on c.service_id = s.id
+        group by date_format(s.service_date, '%Y-%m')
+        order by month
+    </select>
+
+    <!-- 总费用变化趋势 -->
+    <select id="selectCostTrend" resultType="java.util.Map">
+        select
+            date_format(s.service_date, '%Y') as year,
+            coalesce(sum(c.total_cost), 0) as totalCost,
+            coalesce(sum(c.insurance_paid), 0) as insurancePaid,
+            coalesce(sum(c.self_paid), 0) as selfPaid
+        from medical_cost c
+        join medical_service s on c.service_id = s.id
+        group by date_format(s.service_date, '%Y')
+        order by year
+    </select>
+
+    <!-- 按费用类别分析 -->
+    <select id="selectCostCategoryAnalysis" resultType="java.util.Map">
+        select cost_category as name,
+            coalesce(sum(total_cost), 0) as totalCost,
+            count(*) as count
+        from medical_cost c
+        join medical_service s on c.service_id = s.id
+        where cost_category is not null and cost_category != ''
+        <if test="orgId != null"> and s.org_id = #{orgId} </if>
+        <if test="year != null"> and year(s.service_date) = #{year} </if>
+        group by cost_category
+        order by totalCost desc
+    </select>
+
+</mapper>

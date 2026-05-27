@@ -1,28 +1,28 @@
-# 数据源配置
+﻿# 数据源配�?
 spring:
     datasource:
         type: com.alibaba.druid.pool.DruidDataSource
         driverClassName: com.mysql.cj.jdbc.Driver
         druid:
-            # 主库数据源
+            # 主库数据�?
             master:
-                url: jdbc:mysql://localhost:3306/ry-vue?useUnicode=true&characterEncoding=utf8&zeroDateTimeBehavior=convertToNull&useSSL=true&serverTimezone=GMT%2B8
+                url: jdbc:mysql://localhost:3306/health_data_manager?useUnicode=true&characterEncoding=utf8&zeroDateTimeBehavior=convertToNull&useSSL=true&serverTimezone=GMT%2B8
                 username: root
-                password: password
-            # 从库数据源
+                password: l123456789
+            # 从库数据�?
             slave:
-                # 从数据源开关/默认关闭
+                # 从数据源开�?默认关闭
                 enabled: false
                 url: 
                 username: 
                 password: 
-            # 初始连接数
+            # 初始连接�?
             initialSize: 5
             # 最小连接池数量
             minIdle: 10
             # 最大连接池数量
             maxActive: 20
-            # 配置获取连接等待超时的时间
+            # 配置获取连接等待超时的时�?
             maxWait: 60000
             # 配置连接超时时间
             connectTimeout: 30000
@@ -34,7 +34,7 @@ spring:
             minEvictableIdleTimeMillis: 300000
             # 配置一个连接在池中最大生存的时间，单位是毫秒
             maxEvictableIdleTimeMillis: 900000
-            # 配置检测连接是否有效
+            # 配置检测连接是否有�?
             validationQuery: SELECT 1 FROM DUAL
             testWhileIdle: true
             testOnBorrow: false
@@ -43,10 +43,10 @@ spring:
                 enabled: true
             statViewServlet:
                 enabled: true
-                # 设置白名单，不填则允许所有访问
+                # 设置白名单，不填则允许所有访�?
                 allow:
                 url-pattern: /druid/*
-                # 控制台管理用户名和密码
+                # 控制台管理用户名和密�?
                 login-username: ruoyi
                 login-password: 123456
             filter:
@@ -59,3 +59,4 @@ spring:
                 wall:
                     config:
                         multi-statement-allow: true
+

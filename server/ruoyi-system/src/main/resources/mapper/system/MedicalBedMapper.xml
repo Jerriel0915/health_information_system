@@ -1,0 +1,167 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.system.mapper.MedicalBedMapper">
+    
+    <resultMap type="MedicalBed" id="MedicalBedResult">
+        <result property="id"    column="id"    />
+        <result property="orgId"    column="org_id"    />
+        <result property="bedCount"    column="bed_count"    />
+        <result property="actualBedCount"    column="actual_bed_count"    />
+        <result property="usedBedCount"    column="used_bed_count"    />
+        <result property="bedUsageRate"    column="bed_usage_rate"    />
+        <result property="deptType"    column="dept_type"    />
+        <result property="statYear"    column="stat_year"    />
+        <result property="statMonth"    column="stat_month"    />
+        <result property="createdAt"    column="created_at"    />
+        <result property="updatedAt"    column="updated_at"    />
+    </resultMap>
+
+    <sql id="selectMedicalBedVo">
+        select id, org_id, bed_count, actual_bed_count, used_bed_count, bed_usage_rate, dept_type, stat_year, stat_month, created_at, updated_at from medical_bed
+    </sql>
+
+    <select id="selectMedicalBedList" parameterType="MedicalBed" resultMap="MedicalBedResult">
+        <include refid="selectMedicalBedVo"/>
+        <where>  
+            <if test="orgId != null "> and org_id = #{orgId}</if>
+            <if test="bedCount != null "> and bed_count = #{bedCount}</if>
+            <if test="actualBedCount != null "> and actual_bed_count = #{actualBedCount}</if>
+            <if test="usedBedCount != null "> and used_bed_count = #{usedBedCount}</if>
+            <if test="bedUsageRate != null "> and bed_usage_rate = #{bedUsageRate}</if>
+            <if test="deptType != null  and deptType != ''"> and dept_type = #{deptType}</if>
+            <if test="statYear != null "> and stat_year = #{statYear}</if>
+            <if test="statMonth != null "> and stat_month = #{statMonth}</if>
+            <if test="createdAt != null "> and created_at = #{createdAt}</if>
+            <if test="updatedAt != null "> and updated_at = #{updatedAt}</if>
+        </where>
+    </select>
+    
+    <select id="selectMedicalBedById" parameterType="Long" resultMap="MedicalBedResult">
+        <include refid="selectMedicalBedVo"/>
+        where id = #{id}
+    </select>
+
+    <insert id="insertMedicalBed" parameterType="MedicalBed" useGeneratedKeys="true" keyProperty="id">
+        insert into medical_bed
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="orgId != null">org_id,</if>
+            <if test="bedCount != null">bed_count,</if>
+            <if test="actualBedCount != null">actual_bed_count,</if>
+            <if test="usedBedCount != null">used_bed_count,</if>
+            <if test="bedUsageRate != null">bed_usage_rate,</if>
+            <if test="deptType != null">dept_type,</if>
+            <if test="statYear != null">stat_year,</if>
+            <if test="statMonth != null">stat_month,</if>
+            <if test="createdAt != null">created_at,</if>
+            <if test="updatedAt != null">updated_at,</if>
+         </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="orgId != null">#{orgId},</if>
+            <if test="bedCount != null">#{bedCount},</if>
+            <if test="actualBedCount != null">#{actualBedCount},</if>
+            <if test="usedBedCount != null">#{usedBedCount},</if>
+            <if test="bedUsageRate != null">#{bedUsageRate},</if>
+            <if test="deptType != null">#{deptType},</if>
+            <if test="statYear != null">#{statYear},</if>
+            <if test="statMonth != null">#{statMonth},</if>
+            <if test="createdAt != null">#{createdAt},</if>
+            <if test="updatedAt != null">#{updatedAt},</if>
+         </trim>
+    </insert>
+
+    <update id="updateMedicalBed" parameterType="MedicalBed">
+        update medical_bed
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="orgId != null">org_id = #{orgId},</if>
+            <if test="bedCount != null">bed_count = #{bedCount},</if>
+            <if test="actualBedCount != null">actual_bed_count = #{actualBedCount},</if>
+            <if test="usedBedCount != null">used_bed_count = #{usedBedCount},</if>
+            <if test="bedUsageRate != null">bed_usage_rate = #{bedUsageRate},</if>
+            <if test="deptType != null">dept_type = #{deptType},</if>
+            <if test="statYear != null">stat_year = #{statYear},</if>
+            <if test="statMonth != null">stat_month = #{statMonth},</if>
+            <if test="createdAt != null">created_at = #{createdAt},</if>
+            <if test="updatedAt != null">updated_at = #{updatedAt},</if>
+        </trim>
+        where id = #{id}
+    </update>
+
+    <delete id="deleteMedicalBedById" parameterType="Long">
+        delete from medical_bed where id = #{id}
+    </delete>
+
+    <delete id="deleteMedicalBedByIds" parameterType="String">
+        delete from medical_bed where id in 
+        <foreach item="id" collection="array" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </delete>
+
+    <!-- ====== 统计分析查询 ====== -->
+
+    <!-- 床位总览 -->
+    <select id="selectBedSummary" resultType="java.util.Map">
+        select
+            sum(bed_count) as totalBedCount,
+            sum(actual_bed_count) as totalActualBedCount,
+            sum(used_bed_count) as totalUsedBedCount,
+            case when sum(actual_bed_count) > 0
+                then round(sum(used_bed_count) / sum(actual_bed_count) * 100, 2)
+                else 0 end as avgUsageRate
+        from medical_bed
+        <where>
+            <if test="orgId != null"> and org_id = #{orgId} </if>
+            <if test="year != null"> and stat_year = #{year} </if>
+        </where>
+    </select>
+
+    <!-- 按科室分布 -->
+    <select id="selectBedDeptDistribution" resultType="java.util.Map">
+        select dept_type as name, sum(actual_bed_count) as value
+        from medical_bed
+        where 1=1
+        <if test="orgId != null"> and org_id = #{orgId} </if>
+        <if test="year != null"> and stat_year = #{year} </if>
+        group by dept_type
+        order by value desc
+    </select>
+
+    <!-- 按区域分布 -->
+    <select id="selectBedRegionDistribution" resultType="java.util.Map">
+        select r.region_name as name, sum(b.actual_bed_count) as value
+        from medical_bed b
+        join medical_institution i on b.org_id = i.id
+        join dim_region r on i.region_id = r.id
+        group by r.region_name
+        order by value desc
+    </select>
+
+    <!-- 床位数变化趋势 -->
+    <select id="selectBedTrend" resultType="java.util.Map">
+        select stat_year as year, sum(bed_count) as bedCount, sum(actual_bed_count) as actualBedCount
+        from medical_bed
+        group by stat_year
+        order by stat_year
+    </select>
+
+    <!-- 床位使用率分析 -->
+    <select id="selectBedUsageRate" resultType="java.util.Map">
+        select dept_type as name,
+            sum(bed_count) as bedCount,
+            sum(actual_bed_count) as actualBedCount,
+            sum(used_bed_count) as usedBedCount,
+            case when sum(actual_bed_count) > 0
+                then round(sum(used_bed_count) / sum(actual_bed_count) * 100, 2)
+                else 0 end as usageRate
+        from medical_bed
+        <where>
+            <if test="orgId != null"> and org_id = #{orgId} </if>
+            <if test="year != null"> and stat_year = #{year} </if>
+        </where>
+        group by dept_type
+        order by usageRate desc
+    </select>
+
+</mapper>
