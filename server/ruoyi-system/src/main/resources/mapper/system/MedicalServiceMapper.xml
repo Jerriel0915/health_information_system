@@ -1,0 +1,202 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.system.mapper.MedicalServiceMapper">
+    
+    <resultMap type="MedicalService" id="MedicalServiceResult">
+        <result property="id"    column="id"    />
+        <result property="serviceCode"    column="service_code"    />
+        <result property="orgId"    column="org_id"    />
+        <result property="patientName"    column="patient_name"    />
+        <result property="patientGender"    column="patient_gender"    />
+        <result property="patientAge"    column="patient_age"    />
+        <result property="serviceType"    column="service_type"    />
+        <result property="department"    column="department"    />
+        <result property="diagnosisCode"    column="diagnosis_code"    />
+        <result property="diagnosisName"    column="diagnosis_name"    />
+        <result property="doctorId"    column="doctor_id"    />
+        <result property="serviceDate"    column="service_date"    />
+        <result property="dischargeDate"    column="discharge_date"    />
+        <result property="daysInHospital"    column="days_in_hospital"    />
+        <result property="serviceStatus"    column="service_status"    />
+        <result property="createdAt"    column="created_at"    />
+        <result property="updatedAt"    column="updated_at"    />
+    </resultMap>
+
+    <sql id="selectMedicalServiceVo">
+        select id, service_code, org_id, patient_name, patient_gender, patient_age, service_type, department, diagnosis_code, diagnosis_name, doctor_id, service_date, discharge_date, days_in_hospital, service_status, created_at, updated_at from medical_service
+    </sql>
+
+    <select id="selectMedicalServiceList" parameterType="MedicalService" resultMap="MedicalServiceResult">
+        <include refid="selectMedicalServiceVo"/>
+        <where>  
+            <if test="serviceCode != null  and serviceCode != ''"> and service_code = #{serviceCode}</if>
+            <if test="orgId != null "> and org_id = #{orgId}</if>
+            <if test="patientName != null  and patientName != ''"> and patient_name like concat('%', #{patientName}, '%')</if>
+            <if test="patientGender != null "> and patient_gender = #{patientGender}</if>
+            <if test="patientAge != null "> and patient_age = #{patientAge}</if>
+            <if test="serviceType != null  and serviceType != ''"> and service_type = #{serviceType}</if>
+            <if test="department != null  and department != ''"> and department = #{department}</if>
+            <if test="diagnosisCode != null  and diagnosisCode != ''"> and diagnosis_code = #{diagnosisCode}</if>
+            <if test="diagnosisName != null  and diagnosisName != ''"> and diagnosis_name like concat('%', #{diagnosisName}, '%')</if>
+            <if test="doctorId != null "> and doctor_id = #{doctorId}</if>
+            <if test="serviceDate != null "> and service_date = #{serviceDate}</if>
+            <if test="dischargeDate != null "> and discharge_date = #{dischargeDate}</if>
+            <if test="daysInHospital != null "> and days_in_hospital = #{daysInHospital}</if>
+            <if test="serviceStatus != null "> and service_status = #{serviceStatus}</if>
+            <if test="createdAt != null "> and created_at = #{createdAt}</if>
+            <if test="updatedAt != null "> and updated_at = #{updatedAt}</if>
+        </where>
+    </select>
+    
+    <select id="selectMedicalServiceById" parameterType="Long" resultMap="MedicalServiceResult">
+        <include refid="selectMedicalServiceVo"/>
+        where id = #{id}
+    </select>
+
+    <insert id="insertMedicalService" parameterType="MedicalService" useGeneratedKeys="true" keyProperty="id">
+        insert into medical_service
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="serviceCode != null and serviceCode != ''">service_code,</if>
+            <if test="orgId != null">org_id,</if>
+            <if test="patientName != null">patient_name,</if>
+            <if test="patientGender != null">patient_gender,</if>
+            <if test="patientAge != null">patient_age,</if>
+            <if test="serviceType != null and serviceType != ''">service_type,</if>
+            <if test="department != null">department,</if>
+            <if test="diagnosisCode != null">diagnosis_code,</if>
+            <if test="diagnosisName != null">diagnosis_name,</if>
+            <if test="doctorId != null">doctor_id,</if>
+            <if test="serviceDate != null">service_date,</if>
+            <if test="dischargeDate != null">discharge_date,</if>
+            <if test="daysInHospital != null">days_in_hospital,</if>
+            <if test="serviceStatus != null">service_status,</if>
+            <if test="createdAt != null">created_at,</if>
+            <if test="updatedAt != null">updated_at,</if>
+         </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="serviceCode != null and serviceCode != ''">#{serviceCode},</if>
+            <if test="orgId != null">#{orgId},</if>
+            <if test="patientName != null">#{patientName},</if>
+            <if test="patientGender != null">#{patientGender},</if>
+            <if test="patientAge != null">#{patientAge},</if>
+            <if test="serviceType != null and serviceType != ''">#{serviceType},</if>
+            <if test="department != null">#{department},</if>
+            <if test="diagnosisCode != null">#{diagnosisCode},</if>
+            <if test="diagnosisName != null">#{diagnosisName},</if>
+            <if test="doctorId != null">#{doctorId},</if>
+            <if test="serviceDate != null">#{serviceDate},</if>
+            <if test="dischargeDate != null">#{dischargeDate},</if>
+            <if test="daysInHospital != null">#{daysInHospital},</if>
+            <if test="serviceStatus != null">#{serviceStatus},</if>
+            <if test="createdAt != null">#{createdAt},</if>
+            <if test="updatedAt != null">#{updatedAt},</if>
+         </trim>
+    </insert>
+
+    <update id="updateMedicalService" parameterType="MedicalService">
+        update medical_service
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="serviceCode != null and serviceCode != ''">service_code = #{serviceCode},</if>
+            <if test="orgId != null">org_id = #{orgId},</if>
+            <if test="patientName != null">patient_name = #{patientName},</if>
+            <if test="patientGender != null">patient_gender = #{patientGender},</if>
+            <if test="patientAge != null">patient_age = #{patientAge},</if>
+            <if test="serviceType != null and serviceType != ''">service_type = #{serviceType},</if>
+            <if test="department != null">department = #{department},</if>
+            <if test="diagnosisCode != null">diagnosis_code = #{diagnosisCode},</if>
+            <if test="diagnosisName != null">diagnosis_name = #{diagnosisName},</if>
+            <if test="doctorId != null">doctor_id = #{doctorId},</if>
+            <if test="serviceDate != null">service_date = #{serviceDate},</if>
+            <if test="dischargeDate != null">discharge_date = #{dischargeDate},</if>
+            <if test="daysInHospital != null">days_in_hospital = #{daysInHospital},</if>
+            <if test="serviceStatus != null">service_status = #{serviceStatus},</if>
+            <if test="createdAt != null">created_at = #{createdAt},</if>
+            <if test="updatedAt != null">updated_at = #{updatedAt},</if>
+        </trim>
+        where id = #{id}
+    </update>
+
+    <delete id="deleteMedicalServiceById" parameterType="Long">
+        delete from medical_service where id = #{id}
+    </delete>
+
+    <delete id="deleteMedicalServiceByIds" parameterType="String">
+        delete from medical_service where id in 
+        <foreach item="id" collection="array" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </delete>
+
+    <!-- ====== 统计分析查询 ====== -->
+
+    <!-- 服务总览 -->
+    <select id="selectServiceSummary" resultType="java.util.Map">
+        select
+            count(*) as totalServices,
+            count(distinct service_type) as typeCount,
+            sum(case when service_type = '门诊' then 1 else 0 end) as outpatientCount,
+            sum(case when service_type = '住院' then 1 else 0 end) as inpatientCount,
+            round(avg(days_in_hospital), 1) as avgDaysInHospital
+        from medical_service
+        <where>
+            <if test="orgId != null"> and org_id = #{orgId} </if>
+            <if test="year != null"> and year(service_date) = #{year} </if>
+        </where>
+    </select>
+
+    <!-- 按服务类型分布 -->
+    <select id="selectServiceTypeDistribution" resultType="java.util.Map">
+        select service_type as name, count(*) as value
+        from medical_service
+        where 1=1
+        <if test="orgId != null"> and org_id = #{orgId} </if>
+        <if test="year != null"> and year(service_date) = #{year} </if>
+        group by service_type
+        order by value desc
+    </select>
+
+    <!-- 按科室分布 -->
+    <select id="selectServiceDeptDistribution" resultType="java.util.Map">
+        select department as name, count(*) as value
+        from medical_service
+        where 1=1
+        <if test="orgId != null"> and org_id = #{orgId} </if>
+        <if test="year != null"> and year(service_date) = #{year} </if>
+        group by department
+        order by value desc
+    </select>
+
+    <!-- 疾病排行 -->
+    <select id="selectDiagnosisRanking" resultType="java.util.Map">
+        select diagnosis_name as name, count(*) as value
+        from medical_service
+        where diagnosis_name is not null and diagnosis_name != ''
+        <if test="orgId != null"> and org_id = #{orgId} </if>
+        <if test="year != null"> and year(service_date) = #{year} </if>
+        group by diagnosis_name
+        order by value desc
+        <if test="topN != null"> limit #{topN} </if>
+    </select>
+
+    <!-- 服务量变化趋势 -->
+    <select id="selectServiceTrend" resultType="java.util.Map">
+        select date_format(service_date, '%Y') as year, count(*) as value
+        from medical_service
+        group by date_format(service_date, '%Y')
+        order by year
+    </select>
+
+    <!-- 平均住院天数 -->
+    <select id="selectServiceAvgDays" resultType="java.util.Map">
+        select department as name, round(avg(days_in_hospital), 1) as avgDays
+        from medical_service
+        where days_in_hospital is not null
+        <if test="orgId != null"> and org_id = #{orgId} </if>
+        <if test="year != null"> and year(service_date) = #{year} </if>
+        group by department
+        order by avgDays desc
+    </select>
+
+</mapper>
