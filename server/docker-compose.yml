@@ -1,0 +1,83 @@
+services:
+  mysql:
+    image: mysql:8.0.41
+    container_name: his-mysql
+    restart: unless-stopped
+    environment:
+      TZ: ${TZ:-Asia/Shanghai}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-ry-vue}
+      MYSQL_USER: ${MYSQL_USER:-ruoyi}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-change-this-db-password}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-change-this-root-password}
+    command:
+      - --default-authentication-plugin=mysql_native_password
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --skip-name-resolve
+      - --max_connections=300
+    volumes:
+      - ./data/mysql:/var/lib/mysql
+      - ./sql/quartz.sql:/docker-entrypoint-initdb.d/01-quartz.sql:ro
+      - ./sql/ry_20260417.sql:/docker-entrypoint-initdb.d/02-ruoyi.sql:ro
+      - ./init_db.sql:/docker-entrypoint-initdb.d/03-business.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p$$MYSQL_ROOT_PASSWORD --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    networks:
+      - his-network
+
+  redis:
+    image: redis:7.4-alpine
+    container_name: his-redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - ./data/redis:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - his-network
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: his-backend
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      TZ: ${TZ:-Asia/Shanghai}
+      JAVA_OPTS: "${JAVA_OPTS:--Xms512m -Xmx512m}"
+      SERVER_PORT: 8081
+      RUOYI_PROFILE: /data/upload
+      TOKEN_SECRET: ${TOKEN_SECRET:-change-this-token-secret}
+      SPRING_PROFILES_ACTIVE: druid,prod
+      MYSQL_URL: jdbc:mysql://mysql:3306/${MYSQL_DATABASE:-ry-vue}?useUnicode=true&characterEncoding=utf8&zeroDateTimeBehavior=convertToNull&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia%2FShanghai
+      MYSQL_USERNAME: ${MYSQL_USER:-ruoyi}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-change-this-db-password}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_DATABASE: 0
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+      CORS_ALLOWED_ORIGIN_PATTERNS: ${CORS_ALLOWED_ORIGIN_PATTERNS:-}
+    ports:
+      - "${BACKEND_PORT:-8081}:8081"
+    volumes:
+      - ./data/upload:/data/upload
+      - ./data/logs:/app/logs
+    networks:
+      - his-network
+
+networks:
+  his-network:
+    driver: bridge
