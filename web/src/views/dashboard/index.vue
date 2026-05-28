@@ -25,6 +25,63 @@
             <span><el-icon><PieChart /></el-icon> 机构类型分布</span>
             <el-button text size="small" style="float: right;" @click="refreshChart('type')">刷新</el-button>
           </template>
+          <div ref="typeChartRef" style="height: 320px;"></div>
+        </el-card>
+      </el-col>
+      <el-col :span="12">
+        <el-card shadow="hover">
+          <template #header>
+            <span><el-icon><User /></el-icon> 人员职称分布</span>
+            <el-button text size="small" style="float: right;" @click="refreshChart('staff')">刷新</el-button>
+          </template>
+          <div ref="staffChartRef" style="height: 320px;"></div>
+        </el-card>
+      </el-col>
+    </el-row>
+
+    <el-row :gutter="16" class="chart-row">
+      <el-col :span="12">
+        <el-card shadow="hover">
+          <template #header>
+            <span><el-icon><TrendCharts /></el-icon> 服务量趋势</span>
+            <el-button text size="small" style="float: right;" @click="refreshChart('service')">刷新</el-button>
+          </template>
+          <div ref="serviceChartRef" style="height: 320px;"></div>
+        </el-card>
+      </el-col>
+      <el-col :span="12">
+        <el-card shadow="hover">
+          <template #header>
+            <span><el-icon><Money /></el-icon> 费用构成分析</span>
+            <el-button text size="small" style="float: right;" @click="refreshChart('cost')">刷新</el-button>
+          </template>
+          <div ref="costChartRef" style="height: 320px;"></div>
+        </el-card>
+      </el-col>
+    </el-row>
+
+    <el-row :gutter="16" class="chart-row">
+      <el-col :span="24">
+        <el-card shadow="hover">
+          <template #header>
+            <span><el-icon><Warning /></el-icon> 异常预警</span>
+            <el-button text size="small" style="float: right;" @click="$router.push('/ai/index?tab=detection')">查看更多</el-button>
+          </template>
+          <div class="alert-list">
+            <div v-for="alert in alertList" :key="alert.id" class="alert-item" :class="alert.level">
+              <el-icon><CircleClose v-if="alert.level === 'high'" /><Warning v-else-if="alert.level === 'medium'" /><InfoFilled v-else /></el-icon>
+              <span class="alert-content">{{ alert.content }}</span>
+              <span class="alert-time">{{ alert.time }}</span>
+            </div>
+            <div v-if="alertList.length === 0" class="no-alert">
+              <el-icon><SuccessFilled /></el-icon> 暂无异常预警
+            </div>
+          </div>
+        </el-card>
+      </el-col>
+    </el-row>
+  </div>
+</template>
 
 <script setup>
 import { ref, onMounted, onBeforeUnmount } from 'vue'
