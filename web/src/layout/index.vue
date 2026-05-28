@@ -1,116 +1,182 @@
 <template>
-  <div :class="classObj" class="app-wrapper" :style="{ '--current-color': theme, '--current-color-light': theme + '1a', '--current-color-dark-bg': theme + '33' }">
-    <div v-if="device === 'mobile' && sidebar.opened" class="drawer-bg" @click="handleClickOutside"/>
-    <sidebar v-if="!sidebar.hide" class="sidebar-container" />
-    <div :class="{ hasTagsView: needTagsView, sidebarHide: sidebar.hide }" class="main-container">
-      <div :class="{ 'fixed-header': fixedHeader }">
-        <navbar @setLayout="setLayout" />
-        <tags-view v-if="needTagsView" />
+  <div class="app-wrapper">
+    <!-- 侧边栏 -->
+    <div class="sidebar-container">
+      <div class="logo-container">
+        <h2>健康大数据分析系统</h2>
       </div>
-      <app-main />
-      <settings ref="settingRef" />
+      <el-menu
+          :default-active="activeMenu"
+          class="sidebar-menu"
+          router
+          background-color="#304156"
+          text-color="#bfcbd9"
+          active-text-color="#409EFF"
+      >
+        <el-menu-item index="/statistics/dashboard">
+          <el-icon><DataLine /></el-icon>
+          <span>首页</span>
+        </el-menu-item>
+        <el-menu-item index="/statistics/population">
+          <el-icon><User /></el-icon>
+          <span>人口信息统计分析</span>
+        </el-menu-item>
+        <el-menu-item index="/statistics/institution">
+          <el-icon><OfficeBuilding /></el-icon>
+          <span>医疗卫生机构统计分析</span>
+        </el-menu-item>
+        <el-menu-item index="/statistics/staff">
+          <el-icon><UserFilled /></el-icon>
+          <span>医疗卫生人员统计分析</span>
+        </el-menu-item>
+        <el-menu-item index="/statistics/bed">
+          <el-icon><List /></el-icon>
+          <span>医疗卫生床位统计分析</span>
+        </el-menu-item>
+        <el-menu-item index="/statistics/service">
+          <el-icon><FirstAidKit /></el-icon>
+          <span>医疗服务统计分析</span>
+        </el-menu-item>
+        <el-menu-item index="/statistics/cost">
+          <el-icon><Money /></el-icon>
+          <span>医疗费用统计分析</span>
+        </el-menu-item>
+        <el-sub-menu index="/statistics/ai">
+          <template #title>
+            <el-icon><Cpu /></el-icon>
+            <span>智能算法中心</span>
+          </template>
+          <el-menu-item index="/statistics/ai/image">图像分类分析</el-menu-item>
+          <el-menu-item index="/statistics/ai/anomaly">异常检测</el-menu-item>
+          <el-menu-item index="/statistics/ai/chat">智能对话助手</el-menu-item>
+          <el-menu-item index="/statistics/ai/voice">语音功能</el-menu-item>
+        </el-sub-menu>
+      </el-menu>
+    </div>
+
+    <!-- 右侧内容区 -->
+    <div class="main-container">
+      <div class="navbar">
+        <div class="breadcrumb">
+          <el-breadcrumb separator="/">
+            <el-breadcrumb-item :to="{ path: '/' }">首页</el-breadcrumb-item>
+            <el-breadcrumb-item>{{ currentTitle }}</el-breadcrumb-item>
+          </el-breadcrumb>
+        </div>
+        <div class="user-info">
+          <el-dropdown @command="handleCommand">
+            <span class="user-name">
+              admin
+              <el-icon><CaretBottom /></el-icon>
+            </span>
+            <template #dropdown>
+              <el-dropdown-menu>
+                <el-dropdown-item command="logout">退出登录</el-dropdown-item>
+              </el-dropdown-menu>
+            </template>
+          </el-dropdown>
+        </div>
+      </div>
+      <div class="app-main">
+        <router-view />
+      </div>
     </div>
   </div>
 </template>
 
 <script setup>
-import { useWindowSize } from '@vueuse/core'
-import Sidebar from './components/Sidebar/index.vue'
-import { AppMain, Navbar, Settings, TagsView } from './components'
-import useAppStore from '@/store/modules/app'
-import useSettingsStore from '@/store/modules/settings'
+import { computed } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import {
+  DataLine, User, OfficeBuilding, UserFilled, List,
+  FirstAidKit, Money, Cpu, CaretBottom
+} from '@element-plus/icons-vue'
 
-const settingsStore = useSettingsStore()
-const theme = computed(() => settingsStore.theme)
-const sidebar = computed(() => useAppStore().sidebar)
-const device = computed(() => useAppStore().device)
-const needTagsView = computed(() => settingsStore.tagsView)
-const fixedHeader = computed(() => settingsStore.fixedHeader)
+const route = useRoute()
+const router = useRouter()
 
-const classObj = computed(() => ({
-  hideSidebar: !sidebar.value.opened,
-  openSidebar: sidebar.value.opened,
-  withoutAnimation: sidebar.value.withoutAnimation,
-  mobile: device.value === 'mobile'
-}))
+const activeMenu = computed(() => route.path)
+const currentTitle = computed(() => route.meta?.title || '统计分析决策系统')
 
-const { width, height } = useWindowSize()
-const WIDTH = 992 // refer to Bootstrap's responsive design
-
-watch(() => device.value, () => {
-  if (device.value === 'mobile' && sidebar.value.opened) {
-    useAppStore().closeSideBar({ withoutAnimation: false })
+function handleCommand(command) {
+  if (command === 'logout') {
+    // 退出登录逻辑
+    router.push('/login')
   }
-})
-
-watchEffect(() => {
-  if (width.value - 1 < WIDTH) {
-    useAppStore().toggleDevice('mobile')
-    useAppStore().closeSideBar({ withoutAnimation: true })
-  } else {
-    useAppStore().toggleDevice('desktop')
-  }
-})
-
-function handleClickOutside() {
-  useAppStore().closeSideBar({ withoutAnimation: false })
-}
-
-const settingRef = ref(null)
-function setLayout() {
-  settingRef.value.openSetting()
 }
 </script>
 
-<style lang="scss" scoped>
-@use "@/assets/styles/mixin.scss" as mix;
-@use "@/assets/styles/variables.module.scss" as vars;
-
+<style scoped>
 .app-wrapper {
-  @include mix.clearfix;
-  position: relative;
-  height: 100%;
+  display: flex;
+  height: 100vh;
   width: 100%;
-
-  &.mobile.openSidebar {
-    position: fixed;
-    top: 0;
-  }
 }
 
-.main-container:has(.fixed-header) {
-  height: 100vh;
+.sidebar-container {
+  width: 240px;
+  background-color: #304156;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.logo-container {
+  height: 60px;
+  line-height: 60px;
+  text-align: center;
+  background-color: #2b3a4a;
+  color: #fff;
+}
+
+.logo-container h2 {
+  font-size: 16px;
+  margin: 0;
+  white-space: nowrap;
+}
+
+.sidebar-menu {
+  border-right: none;
+  height: calc(100% - 60px);
+  overflow-y: auto;
+}
+
+.main-container {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
   overflow: hidden;
 }
 
-.drawer-bg {
-  background: #000;
-  opacity: 0.3;
-  width: 100%;
-  top: 0;
-  height: 100%;
-  position: absolute;
-  z-index: 999;
+.navbar {
+  height: 50px;
+  background-color: #fff;
+  border-bottom: 1px solid #e6e6e6;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 20px;
 }
 
-.fixed-header {
-  position: fixed;
-  top: 0;
-  right: 0;
-  z-index: 9;
-  width: calc(100% - #{vars.$base-sidebar-width});
-  transition: width 0.28s;
+.breadcrumb {
+  font-size: 14px;
 }
 
-.hideSidebar .fixed-header {
-  width: calc(100% - 54px);
+.user-info {
+  cursor: pointer;
 }
 
-.sidebarHide .fixed-header {
-  width: 100%;
+.user-name {
+  color: #333;
+  display: flex;
+  align-items: center;
+  gap: 5px;
 }
 
-.mobile .fixed-header {
-  width: 100%;
+.app-main {
+  flex: 1;
+  padding: 20px;
+  overflow-y: auto;
+  background-color: #f0f2f6;
 }
 </style>
