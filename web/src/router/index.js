@@ -1,4 +1,4 @@
-import { createWebHistory, createRouter } from 'vue-router'
+﻿import { createWebHistory, createRouter } from 'vue-router'
 /* Layout */
 import Layout from '@/layout'
 
@@ -94,6 +94,124 @@ export const constantRoutes = [
 
 // 动态路由，基于用户权限动态去加载
 export const dynamicRoutes = [
+  // ==================== 统计分析业务页面 ====================
+  {
+    path: '/dashboard',
+    component: Layout,
+    hidden: false,
+    children: [
+      {
+        path: '',
+        component: () => import('@/views/dashboard/index.vue'),
+        name: 'DashboardStat',
+        meta: { title: '首页看板', icon: 'dashboard', affix: true }
+      }
+    ]
+  },
+  {
+    path: '/system/institution',
+    component: Layout,
+    hidden: false,
+    children: [
+      {
+        path: '',
+        component: () => import('@/views/system/institution/index.vue'),
+        name: 'InstitutionStat',
+        meta: { title: '机构统计分析', icon: 'peoples' }
+      }
+    ]
+  },
+  {
+    path: '/system/staff',
+    component: Layout,
+    hidden: false,
+    children: [
+      {
+        path: '',
+        component: () => import('@/views/system/staff/index.vue'),
+        name: 'StaffStat',
+        meta: { title: '人员统计分析', icon: 'user' }
+      }
+    ]
+  },
+  {
+    path: '/system/bed',
+    component: Layout,
+    hidden: false,
+    children: [
+      {
+        path: '',
+        component: () => import('@/views/system/bed/index.vue'),
+        name: 'BedStat',
+        meta: { title: '床位统计分析', icon: 'build' }
+      }
+    ]
+  },
+  {
+    path: '/system/service',
+    component: Layout,
+    hidden: false,
+    children: [
+      {
+        path: '',
+        component: () => import('@/views/system/service/index.vue'),
+        name: 'ServiceStat',
+        meta: { title: '服务统计分析', icon: 'example' }
+      }
+    ]
+  },
+  {
+    path: '/system/cost',
+    component: Layout,
+    hidden: false,
+    children: [
+      {
+        path: '',
+        component: () => import('@/views/system/cost/index.vue'),
+        name: 'CostStat',
+        meta: { title: '费用统计分析', icon: 'money' }
+      }
+    ]
+  },
+  {
+    path: '/system/population',
+    component: Layout,
+    hidden: false,
+    children: [
+      {
+        path: '',
+        component: () => import('@/views/system/population/index.vue'),
+        name: 'PopulationStat',
+        meta: { title: '人口统计分析', icon: 'peoples' }
+      }
+    ]
+  },
+  {
+    path: '/system/region',
+    component: Layout,
+    hidden: false,
+    children: [
+      {
+        path: '',
+        component: () => import('@/views/system/region/index.vue'),
+        name: 'RegionStat',
+        meta: { title: '区域统计分析', icon: 'tree' }
+      }
+    ]
+  },
+  {
+    path: '/ai',
+    component: Layout,
+    hidden: false,
+    children: [
+      {
+        path: 'index',
+        component: () => import('@/views/ai/index.vue'),
+        name: 'AiCenter',
+        meta: { title: '智能分析中心', icon: 'skill' }
+      }
+    ]
+  },
   {
     path: '/system/user-auth',
     component: Layout,
@@ -178,3 +296,4 @@ const router = createRouter({
 })
 
 export default router
+
