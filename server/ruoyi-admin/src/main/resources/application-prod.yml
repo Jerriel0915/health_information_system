@@ -1,0 +1,25 @@
+logging:
+  level:
+    com.ruoyi: info
+    org.springframework: warn
+
+spring:
+  devtools:
+    restart:
+      enabled: false
+  datasource:
+    druid:
+      webStatFilter:
+        enabled: false
+      statViewServlet:
+        enabled: false
+
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false
+
+security:
+  cors:
+    allowed-origin-patterns: ${CORS_ALLOWED_ORIGIN_PATTERNS:}

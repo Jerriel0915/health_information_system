@@ -1,4 +1,4 @@
-﻿# 项目相关配置
+# 项目相关配置
 ruoyi:
   # 名称
   name: RuoYi
@@ -6,8 +6,8 @@ ruoyi:
   version: 3.9.2
   # 版权年份
   copyrightYear: 2026
-  # 文件路径 示例（ Windows配置D:/ruoyi/uploadPath，Linux配置 /home/ruoyi/uploadPath）
-  profile: D:/ruoyi/uploadPath
+  # 文件路径 示例（Windows配置 D:/ruoyi/uploadPath，Linux配置 /home/ruoyi/uploadPath）
+  profile: ${RUOYI_PROFILE:./uploadPath}
   # 获取ip地址开关
   addressEnabled: false
   # 验证码类型 math 数字计算 char 字符验证
@@ -16,7 +16,7 @@ ruoyi:
 # 开发环境配置
 server:
   # 服务器的HTTP端口，默认为8080
-  port: 8081
+  port: ${SERVER_PORT:8081}
   servlet:
     # 应用的访问路径
     context-path: /
@@ -34,7 +34,7 @@ server:
 # 日志配置
 logging:
   level:
-    com.ruoyi: debug
+    com.ruoyi: info
     org.springframework: warn
 
 # 用户配置
@@ -67,18 +67,18 @@ spring:
   devtools:
     restart:
       # 热部署开关
-      enabled: true
+      enabled: ${DEVTOOLS_RESTART_ENABLED:false}
   data:
     # redis 配置
     redis:
       # 地址
-      host: localhost
+      host: ${REDIS_HOST:127.0.0.1}
       # 端口，默认为6379
-      port: 6379
+      port: ${REDIS_PORT:6379}
       # 数据库索引
-      database: 0
+      database: ${REDIS_DATABASE:0}
       # 密码
-      password:
+      password: ${REDIS_PASSWORD:}
       # 连接超时时间
       timeout: 10s
       lettuce:
@@ -97,7 +97,7 @@ token:
   # 令牌自定义标识
   header: Authorization
   # 令牌密钥
-  secret: abcdefghijklmnopqrstuvwxyz
+  secret: ${TOKEN_SECRET:change-this-token-secret}
   # 令牌有效期（默认30分钟）
   expireTime: 30
 
@@ -119,9 +119,10 @@ pagehelper:
 # Springdoc配置
 springdoc:
   api-docs:
+    enabled: ${SPRINGDOC_API_DOCS_ENABLED:true}
     path: /v3/api-docs
   swagger-ui:
-    enabled: true
+    enabled: ${SPRINGDOC_SWAGGER_UI_ENABLED:true}
     path: /swagger-ui.html
     tags-sorter: alpha
   group-configs:
@@ -129,6 +130,11 @@ springdoc:
       display-name: '测试模块'
       paths-to-match: '/**'
       packages-to-scan: com.ruoyi.web.controller.tool
+
+security:
+  cors:
+    enabled: ${CORS_ENABLED:true}
+    allowed-origin-patterns: ${CORS_ALLOWED_ORIGIN_PATTERNS:http://localhost:3000,http://127.0.0.1:3000,http://localhost:5173,http://127.0.0.1:5173}
 
 # 防盗链配置
 referer:
