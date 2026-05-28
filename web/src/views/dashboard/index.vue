@@ -54,7 +54,6 @@ const formatNumber = (value) => {
 
 const goTo = (path) => { if (path) router.push(path) }
 
-// 加载首页概览
 const loadSummary = async () => {
   try {
     const d = await getDashboardSummary()
@@ -67,7 +66,6 @@ const loadSummary = async () => {
   } catch(e) { statCards.value = [{key:'institutions',title:'医疗机构',icon:'OfficeBuilding',value:0,unit:'家',path:'/system/institution'},{key:'staff',title:'人员总数',icon:'User',value:0,unit:'人',path:'/system/staff'},{key:'bed',title:'床位总数',icon:'Grid',value:0,unit:'张',path:'/system/bed'},{key:'service',title:'服务量',icon:'FirstAidKit',value:0,unit:'人次',path:'/system/service'}] }
 }
 
-// ECharts 实例
 const typeChartRef = ref(null)
 const staffChartRef = ref(null)
 const serviceChartRef = ref(null)
@@ -85,66 +83,16 @@ const refreshChart = (name) => {
 }
 
 const renderTypeChart = async () => {
-  try {
-    const data = await getInstitutionTypeDistribution()
-    if (!typeChartRef.value) return
-    if (typeChart) typeChart.dispose()
-    typeChart = echarts.init(typeChartRef.value)
-    const list = Array.isArray(data) ? data : (data.records || data.list || [])
-    typeChart.setOption({
-      tooltip: { trigger: 'item' }, legend: { orient: 'vertical', left: 'left' },
-      series: [{ type: 'pie', radius: '55%', data: list.length ? list.map(d => ({ name: d.name || d.typeName || d.key, value: d.value || d.count || 0 })) : [{ name: '暂无数据', value: 1 }], label: { show: true, formatter: '{b}: {d}%' } }]
-    })
-  } catch(e) {}
+  try { const data = await getInstitutionTypeDistribution(); if (!typeChartRef.value) return; if (typeChart) typeChart.dispose(); typeChart = echarts.init(typeChartRef.value); const list = Array.isArray(data) ? data : (data.records || data.list || []); typeChart.setOption({ tooltip: { trigger: 'item' }, legend: { orient: 'vertical', left: 'left' }, series: [{ type: 'pie', radius: '55%', data: list.length ? list.map(d => ({ name: d.name || d.typeName || d.key, value: d.value || d.count || 0 })) : [{ name: '暂无数据', value: 1 }], label: { show: true, formatter: '{b}: {d}%' } }] }) } catch(e) {}
 }
-
 const renderStaffChart = async () => {
-  try {
-    const data = await getStaffJobTitleDistribution()
-    if (!staffChartRef.value) return
-    if (staffChart) staffChart.dispose()
-    staffChart = echarts.init(staffChartRef.value)
-    const list = Array.isArray(data) ? data : (data.records || data.list || [])
-    staffChart.setOption({
-      tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
-      grid: { left: '3%', right: '4%', bottom: '3%', containLabel: true },
-      xAxis: { type: 'category', data: list.map(d => d.name || d.jobTitle || d.key), axisLabel: { rotate: 30 } },
-      yAxis: { type: 'value', name: '人数' },
-      series: [{ type: 'bar', data: list.map(d => d.value || d.count || 0), itemStyle: { borderRadius: [4, 4, 0, 0], color: '#67C23A' } }]
-    })
-  } catch(e) {}
+  try { const data = await getStaffJobTitleDistribution(); if (!staffChartRef.value) return; if (staffChart) staffChart.dispose(); staffChart = echarts.init(staffChartRef.value); const list = Array.isArray(data) ? data : (data.records || data.list || []); staffChart.setOption({ tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } }, grid: { left: '3%', right: '4%', bottom: '3%', containLabel: true }, xAxis: { type: 'category', data: list.map(d => d.name || d.jobTitle || d.key), axisLabel: { rotate: 30 } }, yAxis: { type: 'value', name: '人数' }, series: [{ type: 'bar', data: list.map(d => d.value || d.count || 0), itemStyle: { borderRadius: [4, 4, 0, 0], color: '#67C23A' } }] }) } catch(e) {}
 }
-
 const renderServiceChart = async () => {
-  try {
-    const data = await getServiceTrend()
-    if (!serviceChartRef.value) return
-    if (serviceChart) serviceChart.dispose()
-    serviceChart = echarts.init(serviceChartRef.value)
-    const list = Array.isArray(data) ? data : (data.records || data.list || [])
-    const years = list.map(d => d.year || d.time || d.date || d.key || '')
-    const values = list.map(d => d.value || d.count || d.serviceCount || 0)
-    serviceChart.setOption({
-      tooltip: { trigger: 'axis' },
-      xAxis: { type: 'category', data: years.length ? years : ['暂无'], name: '年份' },
-      yAxis: { type: 'value', name: '服务量（人次）' },
-      series: [{ type: 'line', data: values.length ? values : [0], smooth: true, lineStyle: { color: '#409EFF', width: 3 }, areaStyle: { opacity: 0.3 }, symbol: 'circle', symbolSize: 8 }]
-    })
-  } catch(e) {}
+  try { const data = await getServiceTrend(); if (!serviceChartRef.value) return; if (serviceChart) serviceChart.dispose(); serviceChart = echarts.init(serviceChartRef.value); const list = Array.isArray(data) ? data : (data.records || data.list || []); const years = list.map(d => d.year || d.time || d.date || d.key || ''); const values = list.map(d => d.value || d.count || d.serviceCount || 0); serviceChart.setOption({ tooltip: { trigger: 'axis' }, xAxis: { type: 'category', data: years.length ? years : ['暂无'], name: '年份' }, yAxis: { type: 'value', name: '服务量（人次）' }, series: [{ type: 'line', data: values.length ? values : [0], smooth: true, lineStyle: { color: '#409EFF', width: 3 }, areaStyle: { opacity: 0.3 }, symbol: 'circle', symbolSize: 8 }] }) } catch(e) {}
 }
-
 const renderCostChart = async () => {
-  try {
-    const data = await getCostComposition()
-    if (!costChartRef.value) return
-    if (costChart) costChart.dispose()
-    costChart = echarts.init(costChartRef.value)
-    const list = Array.isArray(data) ? data : (data.records || data.list || [])
-    costChart.setOption({
-      tooltip: { trigger: 'item' }, legend: { orient: 'vertical', left: 'left' },
-      series: [{ type: 'pie', radius: ['40%', '70%'], data: list.length ? list.map(d => ({ name: d.name || d.costCategory || d.key, value: d.value || d.amount || d.cost || 0 })) : [{ name: '暂无数据', value: 1 }], label: { show: true, formatter: '{b}: {d}%' } }]
-    })
-  } catch(e) {}
+  try { const data = await getCostComposition(); if (!costChartRef.value) return; if (costChart) costChart.dispose(); costChart = echarts.init(costChartRef.value); const list = Array.isArray(data) ? data : (data.records || data.list || []); costChart.setOption({ tooltip: { trigger: 'item' }, legend: { orient: 'vertical', left: 'left' }, series: [{ type: 'pie', radius: ['40%', '70%'], data: list.length ? list.map(d => ({ name: d.name || d.costCategory || d.key, value: d.value || d.amount || d.cost || 0 })) : [{ name: '暂无数据', value: 1 }], label: { show: true, formatter: '{b}: {d}%' } }] }) } catch(e) {}
 }
 
 const handleResize = () => { ;[typeChart, staffChart, serviceChart, costChart].forEach(chart => chart?.resize()) }
