@@ -1,0 +1,12 @@
+﻿.git
+.github
+.idea
+.vscode
+**/target
+**/node_modules
+**/.DS_Store
+*.log
+app-*.err
+app.log.err
+data
+ruoyi-ui
