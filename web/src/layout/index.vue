@@ -2,79 +2,72 @@
   <div class="app-wrapper">
     <!-- 侧边栏 -->
     <div class="sidebar-container">
-      <div class="logo-container">
-        <h2>健康大数据分析系统</h2>
+      <div class="logo">
+        <span>健康大数据系统</span>
       </div>
       <el-menu
-          :default-active="activeMenu"
-          class="sidebar-menu"
-          router
+          :default-active="$route.path"
+          class="el-menu-vertical"
           background-color="#304156"
           text-color="#bfcbd9"
           active-text-color="#409EFF"
+          router
       >
-        <el-menu-item index="/statistics/dashboard">
-          <el-icon><DataLine /></el-icon>
-          <span>首页</span>
+        <el-menu-item index="/dashboard">
+          <el-icon><HomeFilled /></el-icon>
+          <span>首页看板</span>
         </el-menu-item>
-        <el-menu-item index="/statistics/population">
-          <el-icon><User /></el-icon>
-          <span>人口信息统计分析</span>
-        </el-menu-item>
-        <el-menu-item index="/statistics/institution">
-          <el-icon><OfficeBuilding /></el-icon>
-          <span>医疗卫生机构统计分析</span>
-        </el-menu-item>
-        <el-menu-item index="/statistics/staff">
-          <el-icon><UserFilled /></el-icon>
-          <span>医疗卫生人员统计分析</span>
-        </el-menu-item>
-        <el-menu-item index="/statistics/bed">
-          <el-icon><List /></el-icon>
-          <span>医疗卫生床位统计分析</span>
-        </el-menu-item>
-        <el-menu-item index="/statistics/service">
-          <el-icon><FirstAidKit /></el-icon>
-          <span>医疗服务统计分析</span>
-        </el-menu-item>
-        <el-menu-item index="/statistics/cost">
-          <el-icon><Money /></el-icon>
-          <span>医疗费用统计分析</span>
-        </el-menu-item>
-        <el-sub-menu index="/statistics/ai">
+
+        <el-sub-menu index="system">
           <template #title>
-            <el-icon><Cpu /></el-icon>
-            <span>智能算法中心</span>
+            <el-icon><Setting /></el-icon>
+            <span>系统管理</span>
           </template>
-          <el-menu-item index="/statistics/ai/image">图像分类分析</el-menu-item>
-          <el-menu-item index="/statistics/ai/anomaly">异常检测</el-menu-item>
-          <el-menu-item index="/statistics/ai/chat">智能对话助手</el-menu-item>
-          <el-menu-item index="/statistics/ai/voice">语音功能</el-menu-item>
+          <el-menu-item index="/system/institution">
+            <el-icon><OfficeBuilding /></el-icon>
+            <span>医疗机构</span>
+          </el-menu-item>
+          <el-menu-item index="/system/staff">
+            <el-icon><User /></el-icon>
+            <span>人员管理</span>
+          </el-menu-item>
+          <el-menu-item index="/system/bed">
+            <el-icon><Grid /></el-icon>
+            <span>床位管理</span>
+          </el-menu-item>
+          <el-menu-item index="/system/service">
+            <el-icon><FirstAidKit /></el-icon>
+            <span>服务管理</span>
+          </el-menu-item>
+          <el-menu-item index="/system/cost">
+            <el-icon><Money /></el-icon>
+            <span>费用管理</span>
+          </el-menu-item>
+          <el-menu-item index="/system/population">
+            <el-icon><UserFilled /></el-icon>
+            <span>人口统计</span>
+          </el-menu-item>
+          <el-menu-item index="/system/region">
+            <el-icon><Location /></el-icon>
+            <span>区域管理</span>
+          </el-menu-item>
         </el-sub-menu>
+
+        <el-menu-item index="/ai">
+          <el-icon><Cpu /></el-icon>
+          <span>智能分析</span>
+        </el-menu-item>
       </el-menu>
     </div>
 
     <!-- 右侧内容区 -->
     <div class="main-container">
       <div class="navbar">
-        <div class="breadcrumb">
-          <el-breadcrumb separator="/">
-            <el-breadcrumb-item :to="{ path: '/' }">首页</el-breadcrumb-item>
-            <el-breadcrumb-item>{{ currentTitle }}</el-breadcrumb-item>
-          </el-breadcrumb>
-        </div>
-        <div class="user-info">
-          <el-dropdown @command="handleCommand">
-            <span class="user-name">
-              admin
-              <el-icon><CaretBottom /></el-icon>
-            </span>
-            <template #dropdown>
-              <el-dropdown-menu>
-                <el-dropdown-item command="logout">退出登录</el-dropdown-item>
-              </el-dropdown-menu>
-            </template>
-          </el-dropdown>
+        <div class="right-menu">
+          <span class="username">
+            <el-icon><User /></el-icon>
+            管理员
+          </span>
         </div>
       </div>
       <div class="app-main">
@@ -85,25 +78,18 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
 import {
-  DataLine, User, OfficeBuilding, UserFilled, List,
-  FirstAidKit, Money, Cpu, CaretBottom
+  HomeFilled,
+  Setting,
+  OfficeBuilding,
+  User,
+  Grid,
+  FirstAidKit,
+  Money,
+  UserFilled,
+  Location,
+  Cpu
 } from '@element-plus/icons-vue'
-
-const route = useRoute()
-const router = useRouter()
-
-const activeMenu = computed(() => route.path)
-const currentTitle = computed(() => route.meta?.title || '统计分析决策系统')
-
-function handleCommand(command) {
-  if (command === 'logout') {
-    // 退出登录逻辑
-    router.push('/login')
-  }
-}
 </script>
 
 <style scoped>
@@ -112,71 +98,59 @@ function handleCommand(command) {
   height: 100vh;
   width: 100%;
 }
-
 .sidebar-container {
-  width: 240px;
-  background-color: #304156;
-  height: 100%;
-  display: flex;
-  flex-direction: column;
+  width: 220px;
+  background: #304156;
+  color: white;
+  flex-shrink: 0;
 }
-
-.logo-container {
-  height: 60px;
-  line-height: 60px;
+.logo {
+  height: 50px;
+  line-height: 50px;
   text-align: center;
-  background-color: #2b3a4a;
-  color: #fff;
-}
-
-.logo-container h2 {
   font-size: 16px;
-  margin: 0;
-  white-space: nowrap;
+  font-weight: bold;
+  color: white;
+  background: #2b3a4a;
+  border-bottom: 1px solid #1f2d3a;
 }
-
-.sidebar-menu {
+.el-menu-vertical {
   border-right: none;
-  height: calc(100% - 60px);
-  overflow-y: auto;
+  background-color: #304156;
 }
-
+.el-menu-vertical :deep(.el-menu-item),
+.el-menu-vertical :deep(.el-sub-menu__title) {
+  color: #bfcbd9;
+}
+.el-menu-vertical :deep(.el-menu-item.is-active) {
+  color: #409eff;
+  background-color: #263445;
+}
 .main-container {
   flex: 1;
   display: flex;
   flex-direction: column;
   overflow: hidden;
 }
-
 .navbar {
   height: 50px;
-  background-color: #fff;
-  border-bottom: 1px solid #e6e6e6;
+  background: white;
+  box-shadow: 0 1px 4px rgba(0, 21, 41, 0.08);
   display: flex;
+  justify-content: flex-end;
   align-items: center;
-  justify-content: space-between;
   padding: 0 20px;
 }
-
-.breadcrumb {
-  font-size: 14px;
-}
-
-.user-info {
+.username {
   cursor: pointer;
-}
-
-.user-name {
-  color: #333;
   display: flex;
   align-items: center;
-  gap: 5px;
+  gap: 8px;
 }
-
 .app-main {
   flex: 1;
-  padding: 20px;
   overflow-y: auto;
-  background-color: #f0f2f6;
+  padding: 16px;
+  background: #f0f2f6;
 }
 </style>

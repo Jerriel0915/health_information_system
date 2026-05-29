@@ -5,15 +5,7 @@ export function login(data) {
     return request({
         url: '/login',
         method: 'post',
-        data
-    })
-}
-
-// 获取验证码
-export function getCaptcha() {
-    return request({
-        url: '/captchaImage',
-        method: 'get'
+        data: data
     })
 }
 
@@ -21,6 +13,14 @@ export function getCaptcha() {
 export function logout() {
     return request({
         url: '/logout',
-        method: 'delete'
+        method: 'post'
+    })
+}
+
+// 获取用户信息
+export function getInfo() {
+    return request({
+        url: '/getInfo',
+        method: 'get'
     })
 }
