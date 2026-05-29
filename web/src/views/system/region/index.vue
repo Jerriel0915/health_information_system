@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="page-container">
     <el-row :gutter="16" class="stat-cards">
       <el-col :span="6" v-for="item in stats" :key="item.title">
@@ -16,9 +16,9 @@
       <el-form-item><el-button type="primary" @click="handleQuery">搜索</el-button><el-button @click="resetQuery">重置</el-button></el-form-item>
     </el-form>
 
-    <el-row :gutter="10" class="mb8"><el-col :span="1.5"><el-button type="primary" plain @click="handleAdd">新增</el-button></el-col><el-col :span="1.5"><el-button type="success" plain :disabled="single" @click="handleUpdate">修改</el-button></el-col><el-col :span="1.5"><el-button type="danger" plain :disabled="multiple" @click="handleDelete">删除</el-button></el-col><right-toolbar v-model:showSearch="showSearch" @queryTable="getList" /></el-row>
+    <el-row :gutter="10" class="mb8"><el-col :span="1.5"><el-button type="primary" plain @click="handleAdd">新增</el-button></el-col><el-col :span="1.5"><el-button type="success" plain :disabled="single" @click="handleUpdate">修改</el-button></el-col><el-col :span="1.5"><el-button type="danger" plain :disabled="multiple" @click="handleDelete">删除</el-button></el-col></el-row>
 
-    <el-table v-loading="loading" :data="regionList" @selection-change="handleSelectionChange">
+    <el-table v-loading="loading" :data="list" @selection-change="handleSelectionChange">
       <el-table-column type="selection" width="55" /><el-table-column label="序号" prop="id" width="80" /><el-table-column label="区域编码" prop="regionCode" /><el-table-column label="区域名称" prop="regionName" /><el-table-column label="区域级别" prop="regionLevel"><template #default="{ row }"><el-tag :type="row.regionLevel === '1' ? 'danger' : row.regionLevel === '2' ? 'warning' : 'success'">{{ row.regionLevel === '1' ? '省级' : row.regionLevel === '2' ? '市级' : '区县级' }}</el-tag></template></el-table-column><el-table-column label="父级ID" prop="parentId" /><el-table-column label="操作" width="150"><template #default="{ row }"><el-button link type="primary" size="small" @click="handleUpdate(row)">编辑</el-button><el-button link type="danger" size="small" @click="handleDelete(row)">删除</el-button></template></el-table-column>
     </el-table>
     <pagination v-show="total>0" v-model:page="queryParams.pageNum" v-model:limit="queryParams.pageSize" :total="total" @pagination="getList" />
@@ -36,30 +36,151 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, onBeforeUnmount } from 'vue'
+import { ref, onMounted, onBeforeUnmount } from 'vue'
+const showSearch = ref(true)
 import { ElMessage, ElMessageBox } from 'element-plus'
 import * as echarts from 'echarts'
+import { listRegion, addRegion, updateRegion, delRegion, getRegionSummary } from '@/api/system/region'
 
-const stats = ref([{ title: '区域总数', value: 15, unit: '个' }, { title: '省级区域', value: 1, unit: '个' }, { title: '市级区域', value: 5, unit: '个' }, { title: '区县级', value: 9, unit: '个' }])
+// 统计卡片
+const stats = ref([])
 
-const treeChartRef = ref(null); let treeChart = null
-const renderTreeChart = () => { if (!treeChartRef.value) return; if (treeChart) treeChart.dispose(); treeChart = echarts.init(treeChartRef.value); treeChart.setOption({ tooltip: { trigger: 'item' }, series: [{ type: 'tree', data: [{ name: '本省', children: [{ name: 'A市', children: [{ name: 'A1区' }, { name: 'A2区' }] }, { name: 'B市', children: [{ name: 'B1区' }, { name: 'B2区' }] }, { name: 'C市' }] }], left: '2%', right: '2%', top: '10%', bottom: '10%', symbol: 'circle', symbolSize: 12, label: { position: 'left', fontSize: 12 }, expandAndCollapse: true, initialTreeDepth: 2 }] }) }
+// 列表
+const list = ref([])
+const total = ref(0)
+const loading = ref(false)
+const single = ref(true)
+const multiple = ref(true)
+const ids = ref([])
+const dialogVisible = ref(false)
+const dialogTitle = ref('')
+const queryParams = ref({ pageNum: 1, pageSize: 10 })
+const form = ref({})
+const formRef = ref(null)
+const rules = {}
 
-const loading = ref(false); const regionList = ref([]); const total = ref(0); const showSearch = ref(true); const single = ref(true); const multiple = ref(true); const ids = ref([]); const dialogVisible = ref(false); const dialogTitle = ref('')
-const queryParams = reactive({ pageNum: 1, pageSize: 10, regionName: '' })
-const form = ref({}); const formRef = ref(null); const queryFormRef = ref(null)
-const rules = { regionCode: [{ required: true, message: '请填写区域编码' }], regionName: [{ required: true, message: '请填写区域名称' }] }
+// 加载统计卡片
+const loadSummary = async () => {
+  try {
+    const res = await getRegionSummary()
+    if (res.code === 200 && res.data) {
+      const d = res.data
+      const items = []
+      const titleMap = {
+        totalRegions: '区域总数', levelCount: '行政级别数'
+      }
+      for (const [key, value] of Object.entries(d)) {
+        items.push({ key, title: titleMap[key] || key, value: value, unit: '' })
+      }
+      stats.value = items.slice(0, 4)
+    }
+  } catch (e) {
+    console.error('加载统计失败', e)
+  }
+}
 
-const getList = () => { loading.value = true; setTimeout(() => { regionList.value = [{ id: 1, regionCode: '001', regionName: 'A市', regionLevel: '2', parentId: '0' }]; total.value = 1; loading.value = false }, 500) }
-const handleQuery = () => { queryParams.pageNum = 1; getList() }
-const resetQuery = () => { queryFormRef.value?.resetFields(); handleQuery() }
+// CRUD
+const getList = async () => {
+  loading.value = true
+  try {
+    const res = await listRegion(queryParams.value)
+    if (res.code === 200) {
+      list.value = res.rows || []
+      total.value = res.total || 0
+    }
+  } catch (e) {
+    console.error('查询列表失败', e)
+  }
+  loading.value = false
+}
+
+const handleQuery = () => { queryParams.value.pageNum = 1; getList() }
+const resetQuery = () => { queryParams.value = { pageNum: 1, pageSize: 10 }; getList() }
 const handleSelectionChange = (selection) => { ids.value = selection.map(item => item.id); single.value = selection.length !== 1; multiple.value = !selection.length }
-const handleAdd = () => { form.value = {}; dialogTitle.value = '添加区域'; dialogVisible.value = true }
-const handleUpdate = (row) => { form.value = row || {}; dialogTitle.value = '修改区域'; dialogVisible.value = true }
-const submitForm = () => { formRef.value?.validate(valid => { if (valid) { ElMessage.success('操作成功'); dialogVisible.value = false; getList() } }) }
-const handleDelete = (row) => { const id = row?.id || ids.value.join(','); ElMessageBox.confirm('确认删除？').then(() => { ElMessage.success('删除成功'); getList() }).catch(() => {}) }
+const handleAdd = () => { form.value = {}; dialogTitle.value = '添加'; dialogVisible.value = true }
+const handleUpdate = (row) => { form.value = row ? { ...row } : {}; dialogTitle.value = '修改'; dialogVisible.value = true }
+const submitForm = async () => {
+  formRef.value?.validate(async (valid) => {
+    if (valid) {
+      try {
+        const res = form.value.id ? await updateRegion(form.value) : await addRegion(form.value)
+        if (res.code === 200) {
+          ElMessage.success('操作成功')
+          dialogVisible.value = false
+          getList()
+        }
+      } catch (e) {
+        console.error('保存失败', e)
+      }
+    }
+  })
+}
+const handleDelete = async (row) => {
+  const delIds = row?.id || ids.value.join(',')
+  try {
+    await ElMessageBox.confirm('确认删除？')
+    const res = await delRegion(delIds)
+    if (res.code === 200) {
+      ElMessage.success('删除成功')
+      getList()
+    }
+  } catch (e) {
+    if (e !== 'cancel') console.error('删除失败', e)
+  }
+}
 
-onMounted(() => { getList(); renderTreeChart(); window.addEventListener('resize', () => treeChart?.resize()) })
+import { getRegionTree } from '@/api/system/region'
+
+const treeChartRef = ref(null)
+
+let treeChart = null
+
+
+// 将扁平区域列表转为树形结构
+const buildTree = (items) => {
+  const map = {}
+  const roots = []
+  items.forEach(item => { map[item.id] = { ...item, children: [] } })
+  items.forEach(item => {
+    if (item.parentId && map[item.parentId]) {
+      map[item.parentId].children.push(map[item.id])
+    } else if (!item.parentId) {
+      roots.push(map[item.id])
+    }
+  })
+  return roots
+}
+
+const renderChart1 = async () => {
+  if (!treeChartRef.value) return
+  try {
+    const res = await getRegionTree()
+    const flatData = res.code === 200 ? (res.data || []) : []
+    const treeData = flatData.length ? buildTree(flatData) : [{ name: '暂无数据' }]
+    if (treeChart) treeChart.dispose()
+    treeChart = echarts.init(treeChartRef.value)
+    treeChart.setOption({
+      tooltip: { trigger: 'item' },
+      series: [{
+        type: 'tree',
+        data: treeData.length ? treeData : [{ name: '暂无数据' }],
+        left: '2%', right: '2%', top: '10%', bottom: '10%',
+        symbol: 'circle', symbolSize: 12,
+        label: { position: 'left', fontSize: 12 },
+        expandAndCollapse: true, initialTreeDepth: 2
+      }]
+    })
+  } catch (e) { console.error('加载区域树失败', e) }
+}
+
+const renderChart2 = async () => {}
+
+onMounted(async () => {
+  await loadSummary()
+  await Promise.all([renderChart1(), renderChart2()])
+  getList()
+  window.addEventListener('resize', () => { treeChart?.resize() })
+})
 onBeforeUnmount(() => { treeChart?.dispose() })
 </script>
 
@@ -75,3 +196,6 @@ onBeforeUnmount(() => { treeChart?.dispose() })
 .chart-card { margin-bottom: 20px; }
 .mb8 { margin-bottom: 8px; }
 </style>
+
+
+

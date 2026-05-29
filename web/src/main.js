@@ -2,6 +2,7 @@
 import App from './App.vue'
 import router from './router'
 import ElementPlus from 'element-plus'
+import Pagination from '@/components/Pagination.vue'
 import 'element-plus/dist/index.css'
 import * as echarts from 'echarts'
 import store from '@/store'
@@ -10,6 +11,7 @@ const app = createApp(App)
 
 // 使用 Element Plus
 app.use(ElementPlus)
+app.component('Pagination', Pagination)
 
 // 使用路由
 app.use(router)
@@ -52,3 +54,4 @@ app.config.globalProperties.formatNumber = (value) => {
 }
 
 app.mount('#app')
+
