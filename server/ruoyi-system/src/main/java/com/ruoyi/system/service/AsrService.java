@@ -51,15 +51,11 @@ public class AsrService
 
         try
         {
-            // 设置 API Key（也可以通过环境变量 DASHSCOPE_API_KEY）
-            if (config.getDashscopeApiKey() != null && !config.getDashscopeApiKey().isEmpty())
-            {
-                System.setProperty("dashscope.api.key", config.getDashscopeApiKey());
-            }
 
             // 构建实时识别参数
             RecognitionParam param = RecognitionParam.builder()
                     .model("paraformer-realtime-v2")
+                    .apiKey(config.getDashscopeApiKey())
                     .format("wav")
                     .sampleRate(16000)
                     .parameter("language_hints", new String[]{"zh", "en"})

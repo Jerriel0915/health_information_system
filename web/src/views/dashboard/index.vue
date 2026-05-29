@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="dashboard-container">
     <el-row :gutter="16" class="stat-cards">
       <el-col :span="6" v-for="card in statCards" :key="card.key">
@@ -9,7 +9,7 @@
           <div class="card-content">
             <div class="card-title">{{ card.title }}</div>
             <div class="card-value">{{ formatNumber(card.value) }}<span class="unit">{{ card.unit }}</span></div>
-            <div class="card-compare" v-if="card.compare">
+            <div class="card-compare" v-if="card.compare !== undefined">
               <el-icon><CaretTop v-if="card.compare > 0" /><CaretBottom v-else /></el-icon>
               {{ Math.abs(card.compare) }}%
             </div>
@@ -84,7 +84,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onBeforeUnmount } from 'vue'
+import { ref, markRaw, onMounted, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
 import * as echarts from 'echarts'
 import {
@@ -92,23 +92,24 @@ import {
   TrendCharts, Warning, CircleClose, InfoFilled, SuccessFilled,
   CaretTop, CaretBottom
 } from '@element-plus/icons-vue'
+import { getDashboardSummary } from '@/api/dashboard'
+import { getInstitutionTypeDistribution, getInstitutionTrend } from '@/api/system/institution'
+import { getStaffJobTitleDistribution, getStaffTrend } from '@/api/system/staff'
+import { getServiceTrend } from '@/api/system/service'
+import { getCostComposition, getCostTrend } from '@/api/system/cost'
 
 const router = useRouter()
 
 // 统计卡片数据
 const statCards = ref([
-  { key: 'institutions', title: '医疗机构', icon: 'OfficeBuilding', value: 78, unit: '家', compare: 2.5, path: '/system/institution' },
-  { key: 'staff', title: '人员总数', icon: 'User', value: 5206, unit: '人', compare: 3.2, path: '/system/staff' },
-  { key: 'bed', title: '床位总数', icon: 'Grid', value: 140710, unit: '张', compare: 1.8, path: '/system/bed' },
-  { key: 'service', title: '服务量', icon: 'FirstAidKit', value: 50000, unit: '人次', compare: 8.3, path: '/system/service' }
+    { key: 'institutions', title: '医疗机构', icon: markRaw(OfficeBuilding), value: 0, unit: '家', path: '/system/institution' },
+    { key: 'staff', title: '人员总数', icon: markRaw(User), value: 0, unit: '人', path: '/system/staff' },
+    { key: 'bed', title: '床位总数', icon: markRaw(Grid), value: 0, unit: '张', path: '/system/bed' },
+    { key: 'service', title: '服务量', icon: markRaw(FirstAidKit), value: 0, unit: '人次', path: '/system/service' }
 ])
 
-// 异常预警
-const alertList = ref([
-  { id: 1, level: 'high', content: '市第一人民医院床位使用率超过95%，请关注', time: '10分钟前' },
-  { id: 2, level: 'medium', content: '仁爱医院发现3条疑似违规收费记录', time: '30分钟前' },
-  { id: 3, level: 'low', content: '光明社区卫生中心人员缺口较大', time: '1小时前' }
-])
+// 异常预警（暂用占位，后续可从后端获取）
+const alertList = ref([])
 
 // ECharts 实例
 const typeChartRef = ref(null)
@@ -121,83 +122,126 @@ let serviceChart = null
 let costChart = null
 
 const formatNumber = (value) => {
-  if (!value) return 0
+  if (!value && value !== 0) return '--'
   if (value >= 10000) return (value / 10000).toFixed(1) + '万'
   return value.toLocaleString()
 }
 
 const goTo = (path) => { if (path) router.push(path) }
 
-// 图表渲染
-const renderTypeChart = () => {
+// 加载统计卡片数据
+const loadSummary = async () => {
+  try {
+    const token = document.cookie.split(';').find(c => c.trim().startsWith('Admin-Token='))
+    console.log('[Dashboard] cookie token:', token ? token.substring(0, 40) + '...' : 'EMPTY')
+    const res = await getDashboardSummary()
+    if (res.code === 200 && res.data) {
+      const d = res.data
+      statCards.value = [
+    { key: 'institutions', title: '医疗机构', icon: markRaw(OfficeBuilding), value: d.totalInstitutions || 0, unit: '家', path: '/system/institution' },
+    { key: 'staff', title: '人员总数', icon: markRaw(User), value: d.totalStaff || 0, unit: '人', path: '/system/staff' },
+    { key: 'bed', title: '床位总数', icon: markRaw(Grid), value: d.totalBedCount || 0, unit: '张', path: '/system/bed' },
+    { key: 'service', title: '服务量', icon: markRaw(FirstAidKit), value: d.totalServices || 0, unit: '人次', path: '/system/service' }
+      ]
+    }
+  } catch (e) {
+    console.error('加载首页统计失败', e)
+  }
+}
+
+// 图表渲染 — 机构类型分布
+const renderTypeChart = async () => {
   if (!typeChartRef.value) return
-  if (typeChart) typeChart.dispose()
-  typeChart = echarts.init(typeChartRef.value)
-  typeChart.setOption({
-    tooltip: { trigger: 'item' },
-    legend: { orient: 'vertical', left: 'left' },
-    series: [{
-      type: 'pie', radius: '55%',
-      data: [
-        { name: '综合医院', value: 42 },
-        { name: '专科医院', value: 18 },
-        { name: '社区卫生服务中心', value: 12 },
-        { name: '乡镇卫生院', value: 6 }
-      ],
-      label: { show: true, formatter: '{b}: {d}%' }
-    }]
-  })
+  try {
+    const res = await getInstitutionTypeDistribution()
+    const data = res.code === 200 ? (res.data || []) : []
+    if (typeChart) typeChart.dispose()
+    typeChart = echarts.init(typeChartRef.value)
+    typeChart.setOption({
+      tooltip: { trigger: 'item' },
+      legend: { orient: 'vertical', left: 'left' },
+      series: [{
+        type: 'pie', radius: '55%',
+        data: data.length ? data : [{ name: '暂无数据', value: 1 }],
+        label: { show: true, formatter: '{b}: {d}%' }
+      }]
+    })
+  } catch (e) {
+    console.error('加载机构类型分布失败', e)
+  }
 }
 
-const renderStaffChart = () => {
+// 图表渲染 — 人员职称分布
+const renderStaffChart = async () => {
   if (!staffChartRef.value) return
-  if (staffChart) staffChart.dispose()
-  staffChart = echarts.init(staffChartRef.value)
-  staffChart.setOption({
-    tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
-    grid: { left: '3%', right: '4%', bottom: '3%', containLabel: true },
-    xAxis: { type: 'category', data: ['主任医师', '副主任医师', '主治医师', '住院医师', '护士', '医技人员'], axisLabel: { rotate: 30 } },
-    yAxis: { type: 'value', name: '人数' },
-    series: [{ type: 'bar', data: [156, 423, 892, 507, 2343, 885], itemStyle: { borderRadius: [4, 4, 0, 0], color: '#67C23A' } }]
-  })
+  try {
+    const res = await getStaffJobTitleDistribution()
+    const data = res.code === 200 ? (res.data || []) : []
+    if (staffChart) staffChart.dispose()
+    staffChart = echarts.init(staffChartRef.value)
+    staffChart.setOption({
+      tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
+      grid: { left: '3%', right: '4%', bottom: '3%', containLabel: true },
+      xAxis: { type: 'category', data: data.map(d => d.name) || [] },
+      yAxis: { type: 'value', name: '人数' },
+      series: [{ type: 'bar', data: data.map(d => d.value) || [], itemStyle: { borderRadius: [4, 4, 0, 0], color: '#67C23A' } }]
+    })
+  } catch (e) {
+    console.error('加载人员职称分布失败', e)
+  }
 }
 
-const renderServiceChart = () => {
+// 图表渲染 — 服务量趋势
+const renderServiceChart = async () => {
   if (!serviceChartRef.value) return
-  if (serviceChart) serviceChart.dispose()
-  serviceChart = echarts.init(serviceChartRef.value)
-  serviceChart.setOption({
-    tooltip: { trigger: 'axis' },
-    xAxis: { type: 'category', data: ['2021', '2022', '2023', '2024', '2025'], name: '年份' },
-    yAxis: { type: 'value', name: '服务量（人次）' },
-    series: [{
-      type: 'line', data: [42000, 44500, 46800, 49200, 50000],
-      smooth: true, lineStyle: { color: '#409EFF', width: 3 },
-      areaStyle: { opacity: 0.3 }, symbol: 'circle', symbolSize: 8
-    }]
-  })
+  try {
+    const res = await getServiceTrend()
+    const data = res.code === 200 ? (res.data || []) : []
+    if (serviceChart) serviceChart.dispose()
+    serviceChart = echarts.init(serviceChartRef.value)
+    serviceChart.setOption({
+      tooltip: { trigger: 'axis' },
+      xAxis: { type: 'category', data: data.map(d => d.year || d.name) || [], name: '年份' },
+      yAxis: { type: 'value', name: '服务量（人次）' },
+      series: [{
+        type: 'line', data: data.map(d => d.value) || [],
+        smooth: true, lineStyle: { color: '#409EFF', width: 3 },
+        areaStyle: { opacity: 0.3 }, symbol: 'circle', symbolSize: 8
+      }]
+    })
+  } catch (e) {
+    console.error('加载服务量趋势失败', e)
+  }
 }
 
-const renderCostChart = () => {
+// 图表渲染 — 费用构成分析
+const renderCostChart = async () => {
   if (!costChartRef.value) return
-  if (costChart) costChart.dispose()
-  costChart = echarts.init(costChartRef.value)
-  costChart.setOption({
-    tooltip: { trigger: 'item' },
-    legend: { orient: 'vertical', left: 'left' },
-    series: [{
-      type: 'pie', radius: ['40%', '70%'],
-      data: [
-        { name: '药品费', value: 10170 },
-        { name: '治疗费', value: 8899 },
-        { name: '检查费', value: 5721 },
-        { name: '手术费', value: 3814 },
-        { name: '床位费', value: 2225 },
-        { name: '护理费', value: 1271 }
-      ],
-      label: { show: true, formatter: '{b}: {d}%' }
-    }]
-  })
+  try {
+    const res = await getCostComposition()
+    const data = res.code === 200 ? (res.data || {}) : {}
+    if (costChart) costChart.dispose()
+    costChart = echarts.init(costChartRef.value)
+    const chartData = [
+      { name: '药品费', value: data.drugCost || 0 },
+      { name: '治疗费', value: data.treatmentCost || 0 },
+      { name: '检查费', value: data.inspectionCost || 0 },
+      { name: '手术费', value: data.surgeryCost || 0 },
+      { name: '床位费', value: data.bedCost || 0 },
+      { name: '护理费', value: data.nursingCost || 0 }
+    ].filter(d => d.value > 0)
+    costChart.setOption({
+      tooltip: { trigger: 'item' },
+      legend: { orient: 'vertical', left: 'left' },
+      series: [{
+        type: 'pie', radius: ['40%', '70%'],
+        data: chartData.length ? chartData : [{ name: '暂无数据', value: 1 }],
+        label: { show: true, formatter: '{b}: {d}%' }
+      }]
+    })
+  } catch (e) {
+    console.error('加载费用构成失败', e)
+  }
 }
 
 const refreshChart = (type) => {
@@ -214,11 +258,14 @@ const handleResize = () => {
   costChart?.resize()
 }
 
-onMounted(() => {
-  renderTypeChart()
-  renderStaffChart()
-  renderServiceChart()
-  renderCostChart()
+onMounted(async () => {
+  await loadSummary()
+  await Promise.all([
+    renderTypeChart(),
+    renderStaffChart(),
+    renderServiceChart(),
+    renderCostChart()
+  ])
   window.addEventListener('resize', handleResize)
 })
 
@@ -253,3 +300,4 @@ onBeforeUnmount(() => {
 .no-alert { text-align: center; padding: 40px 0; color: #52c41a; }
 .no-alert .el-icon { font-size: 48px; margin-bottom: 12px; display: block; }
 </style>
+

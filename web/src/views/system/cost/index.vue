@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="page-container">
     <el-row :gutter="16" class="stat-cards">
       <el-col :span="6" v-for="item in stats" :key="item.title">
@@ -16,9 +16,9 @@
       <el-form-item><el-button type="primary" @click="handleQuery">搜索</el-button><el-button @click="resetQuery">重置</el-button></el-form-item>
     </el-form>
 
-    <el-row :gutter="10" class="mb8"><el-col :span="1.5"><el-button type="primary" plain @click="handleAdd">新增</el-button></el-col><el-col :span="1.5"><el-button type="success" plain :disabled="single" @click="handleUpdate">修改</el-button></el-col><el-col :span="1.5"><el-button type="danger" plain :disabled="multiple" @click="handleDelete">删除</el-button></el-col><right-toolbar v-model:showSearch="showSearch" @queryTable="getList" /></el-row>
+    <el-row :gutter="10" class="mb8"><el-col :span="1.5"><el-button type="primary" plain @click="handleAdd">新增</el-button></el-col><el-col :span="1.5"><el-button type="success" plain :disabled="single" @click="handleUpdate">修改</el-button></el-col><el-col :span="1.5"><el-button type="danger" plain :disabled="multiple" @click="handleDelete">删除</el-button></el-col></el-row>
 
-    <el-table v-loading="loading" :data="costList" @selection-change="handleSelectionChange">
+    <el-table v-loading="loading" :data="list" @selection-change="handleSelectionChange">
       <el-table-column type="selection" width="55" /><el-table-column label="序号" prop="id" width="80" /><el-table-column label="服务ID" prop="serviceId" /><el-table-column label="费用总额" prop="totalCost" /><el-table-column label="药品费" prop="drugCost" /><el-table-column label="治疗费" prop="treatmentCost" /><el-table-column label="医保支付" prop="insurancePaid" /><el-table-column label="自费金额" prop="selfPaid" /><el-table-column label="操作" width="150"><template #default="{ row }"><el-button link type="primary" size="small" @click="handleUpdate(row)">编辑</el-button><el-button link type="danger" size="small" @click="handleDelete(row)">删除</el-button></template></el-table-column>
     </el-table>
     <pagination v-show="total>0" v-model:page="queryParams.pageNum" v-model:limit="queryParams.pageSize" :total="total" @pagination="getList" />
@@ -36,33 +36,153 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, onBeforeUnmount } from 'vue'
+import { ref, onMounted, onBeforeUnmount } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import * as echarts from 'echarts'
+import { listCost, addCost, updateCost, delCost, getCostSummary, getCostComposition, getCostTrend } from '@/api/system/cost'
 
-const stats = ref([{ title: '费用总额', value: 317828163 }, { title: '医保支付', value: 156084720 }, { title: '自费金额', value: 161743443 }, { title: '医保占比', value: 49.1 }])
+const showSearch = ref(true)
 
-const compositionChartRef = ref(null); const trendChartRef = ref(null); let compositionChart = null; let trendChart = null
-const renderCompositionChart = () => { if (!compositionChartRef.value) return; if (compositionChart) compositionChart.dispose(); compositionChart = echarts.init(compositionChartRef.value); compositionChart.setOption({ tooltip: { trigger: 'item' }, legend: { orient: 'vertical', left: 'left' }, series: [{ type: 'pie', radius: '55%', data: [{ name: '药品费', value: 10170 }, { name: '治疗费', value: 8899 }, { name: '检查费', value: 5721 }, { name: '手术费', value: 3814 }, { name: '床位费', value: 2225 }, { name: '护理费', value: 1271 }], label: { show: true, formatter: '{b}: {d}%' } }] }) }
-const renderTrendChart = () => { if (!trendChartRef.value) return; if (trendChart) trendChart.dispose(); trendChart = echarts.init(trendChartRef.value); trendChart.setOption({ tooltip: { trigger: 'axis' }, xAxis: { type: 'category', data: ['2021', '2022', '2023', '2024', '2025'] }, yAxis: { type: 'value', name: '费用（万元）' }, series: [{ type: 'line', data: [28500, 29800, 30500, 31200, 31783], smooth: true, lineStyle: { color: '#409EFF', width: 3 }, areaStyle: { opacity: 0.3 } }] }) }
+// 统计卡片
+const stats = ref([])
 
-const formatMoney = (val) => { if (!val) return 0; if (val >= 10000) return '¥' + (val / 10000).toFixed(1) + '万'; return '¥' + val.toLocaleString() }
+const formatMoney = (val) => {
+  if (!val && val !== 0) return '--'
+  if (val >= 100000000) return '¥' + (val / 100000000).toFixed(2) + '亿'
+  if (val >= 10000) return '¥' + (val / 10000).toFixed(1) + '万'
+  return '¥' + Number(val).toLocaleString()
+}
 
-const loading = ref(false); const costList = ref([]); const total = ref(0); const showSearch = ref(true); const single = ref(true); const multiple = ref(true); const ids = ref([]); const dialogVisible = ref(false); const dialogTitle = ref('')
-const queryParams = reactive({ pageNum: 1, pageSize: 10, serviceId: '' })
-const form = ref({}); const formRef = ref(null); const queryFormRef = ref(null)
+// 列表
+const list = ref([])
+const total = ref(0)
+const loading = ref(false)
+const single = ref(true)
+const multiple = ref(true)
+const ids = ref([])
+const dialogVisible = ref(false)
+const dialogTitle = ref('')
+const queryParams = ref({ pageNum: 1, pageSize: 10, serviceId: '' })
+const form = ref({})
+const formRef = ref(null)
 const rules = { serviceId: [{ required: true, message: '请填写服务ID' }] }
 
-const getList = () => { loading.value = true; setTimeout(() => { costList.value = [{ id: 1, serviceId: 'S001', totalCost: 5000, drugCost: 2000, treatmentCost: 1500, insurancePaid: 3500, selfPaid: 1500 }]; total.value = 1; loading.value = false }, 500) }
-const handleQuery = () => { queryParams.pageNum = 1; getList() }
-const resetQuery = () => { queryFormRef.value?.resetFields(); handleQuery() }
+// 图表
+const compositionChartRef = ref(null)
+const trendChartRef = ref(null)
+let compositionChart = null
+let trendChart = null
+
+// 加载统计
+const loadSummary = async () => {
+  try {
+    const res = await getCostSummary()
+    if (res.code === 200 && res.data) {
+      const d = res.data
+      stats.value = [
+        { title: '费用总额', value: d.totalCost || 0 },
+        { title: '医保支付', value: d.totalInsurancePaid || 0 },
+        { title: '自费金额', value: d.totalSelfPaid || 0 },
+        { title: '总记录数', value: d.totalRecords || 0 }
+      ]
+    }
+  } catch (e) { console.error('加载费用统计失败', e) }
+}
+
+// 图表渲染
+const renderCompositionChart = async () => {
+  if (!compositionChartRef.value) return
+  try {
+    const res = await getCostComposition()
+    const data = res.code === 200 ? (res.data || {}) : {}
+    if (compositionChart) compositionChart.dispose()
+    compositionChart = echarts.init(compositionChartRef.value)
+    const chartData = [
+      { name: '药品费', value: data.drugCost || 0 },
+      { name: '治疗费', value: data.treatmentCost || 0 },
+      { name: '检查费', value: data.inspectionCost || 0 },
+      { name: '手术费', value: data.surgeryCost || 0 },
+      { name: '床位费', value: data.bedCost || 0 },
+      { name: '护理费', value: data.nursingCost || 0 }
+    ].filter(d => d.value > 0)
+    compositionChart.setOption({
+      tooltip: { trigger: 'item' },
+      legend: { orient: 'vertical', left: 'left' },
+      series: [{ type: 'pie', radius: '55%', data: chartData.length ? chartData : [{ name: '暂无数据', value: 1 }], label: { show: true, formatter: '{b}: {d}%' } }]
+    })
+  } catch (e) { console.error('加载费用构成失败', e) }
+}
+
+const renderTrendChart = async () => {
+  if (!trendChartRef.value) return
+  try {
+    const res = await getCostTrend()
+    const data = res.code === 200 ? (res.data || []) : []
+    if (trendChart) trendChart.dispose()
+    trendChart = echarts.init(trendChartRef.value)
+    trendChart.setOption({
+      tooltip: { trigger: 'axis' },
+      legend: { data: ['总费用', '医保支付', '自费金额'] },
+      xAxis: { type: 'category', data: data.map(d => d.year || d.name) || [], name: '年份' },
+      yAxis: { type: 'value', name: '金额（元）' },
+      series: [
+        { name: '总费用', type: 'line', data: data.map(d => d.totalCost) || [], smooth: true, lineStyle: { color: '#409EFF', width: 3 }, areaStyle: { opacity: 0.2 } },
+        { name: '医保支付', type: 'line', data: data.map(d => d.insurancePaid) || [], smooth: true, lineStyle: { color: '#67C23A', width: 2 } },
+        { name: '自费金额', type: 'line', data: data.map(d => d.selfPaid) || [], smooth: true, lineStyle: { color: '#E6A23C', width: 2 } }
+      ]
+    })
+  } catch (e) { console.error('加载费用趋势失败', e) }
+}
+
+// CRUD
+const getList = async () => {
+  loading.value = true
+  try {
+    const res = await listCost(queryParams.value)
+    if (res.code === 200) {
+      list.value = res.rows || []
+      total.value = res.total || 0
+    }
+  } catch (e) { console.error('查询费用列表失败', e) }
+  loading.value = false
+}
+
+const handleQuery = () => { queryParams.value.pageNum = 1; getList() }
+const resetQuery = () => { queryParams.value = { pageNum: 1, pageSize: 10, serviceId: '' }; getList() }
 const handleSelectionChange = (selection) => { ids.value = selection.map(item => item.id); single.value = selection.length !== 1; multiple.value = !selection.length }
 const handleAdd = () => { form.value = {}; dialogTitle.value = '添加费用'; dialogVisible.value = true }
-const handleUpdate = (row) => { form.value = row || {}; dialogTitle.value = '修改费用'; dialogVisible.value = true }
-const submitForm = () => { formRef.value?.validate(valid => { if (valid) { ElMessage.success('操作成功'); dialogVisible.value = false; getList() } }) }
-const handleDelete = (row) => { const id = row?.id || ids.value.join(','); ElMessageBox.confirm('确认删除？').then(() => { ElMessage.success('删除成功'); getList() }).catch(() => {}) }
+const handleUpdate = (row) => { form.value = row ? { ...row } : {}; dialogTitle.value = '修改费用'; dialogVisible.value = true }
+const submitForm = async () => {
+  formRef.value?.validate(async (valid) => {
+    if (valid) {
+      try {
+        const res = form.value.id ? await updateCost(form.value) : await addCost(form.value)
+        if (res.code === 200) {
+          ElMessage.success('操作成功')
+          dialogVisible.value = false
+          getList()
+        }
+      } catch (e) { console.error('保存费用失败', e) }
+    }
+  })
+}
+const handleDelete = async (row) => {
+  const delIds = row?.id || ids.value.join(',')
+  try {
+    await ElMessageBox.confirm('确认删除？')
+    const res = await delCost(delIds)
+    if (res.code === 200) {
+      ElMessage.success('删除成功')
+      getList()
+    }
+  } catch (e) { if (e !== 'cancel') console.error('删除失败', e) }
+}
 
-onMounted(() => { getList(); renderCompositionChart(); renderTrendChart(); window.addEventListener('resize', () => { compositionChart?.resize(); trendChart?.resize() }) })
+onMounted(async () => {
+  await loadSummary()
+  await Promise.all([renderCompositionChart(), renderTrendChart()])
+  getList()
+})
 onBeforeUnmount(() => { compositionChart?.dispose(); trendChart?.dispose() })
 </script>
 
@@ -77,3 +197,5 @@ onBeforeUnmount(() => { compositionChart?.dispose(); trendChart?.dispose() })
 .chart-row { margin-bottom: 20px; }
 .mb8 { margin-bottom: 8px; }
 </style>
+
+

@@ -1,12 +1,7 @@
-<template>
+﻿<template>
   <div class="page-container">
     <!-- 统计卡片 -->
-    <el-row :gutter="16" class="stat-cards">
-      <el-col :span="6"><el-card shadow="hover" class="stat-card"><div class="stat-card-inner"><div class="stat-title">人员总数</div><div class="stat-value">5,206<span class="unit">人</span></div></div></el-card></el-col>
-      <el-col :span="6"><el-card shadow="hover" class="stat-card"><div class="stat-card-inner"><div class="stat-title">医生人数</div><div class="stat-value">1,978<span class="unit">人</span></div></div></el-card></el-col>
-      <el-col :span="6"><el-card shadow="hover" class="stat-card"><div class="stat-card-inner"><div class="stat-title">护士人数</div><div class="stat-value">2,343<span class="unit">人</span></div></div></el-card></el-col>
-      <el-col :span="6"><el-card shadow="hover" class="stat-card"><div class="stat-card-inner"><div class="stat-title">医技人员</div><div class="stat-value">885<span class="unit">人</span></div></div></el-card></el-col>
-    </el-row>
+    <el-row :gutter="16" class="stat-cards"><el-col :span="6" v-for="stat in stats" :key="stat.key"><el-card shadow="hover" class="stat-card"><div class="stat-card-inner"><div class="stat-title">{{ stat.title }}</div><div class="stat-value">{{ stat.value }}<span class="unit">{{ stat.unit }}</span></div></div></el-card></el-col></el-row>
 
     <!-- 图表区域 -->
     <el-row :gutter="16" class="chart-row">
@@ -33,7 +28,7 @@
     </el-row>
 
     <!-- 数据表格 -->
-    <el-table v-loading="loading" :data="staffList" @selection-change="handleSelectionChange">
+    <el-table v-loading="loading" :data="list" @selection-change="handleSelectionChange">
       <el-table-column type="selection" width="55" />
       <el-table-column label="序号" prop="id" width="80" />
       <el-table-column label="姓名" prop="staffName" />
@@ -68,19 +63,13 @@
 import { ref, onMounted, onBeforeUnmount } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import * as echarts from 'echarts'
+import { listStaff, addStaff, updateStaff, delStaff, getStaffSummary } from '@/api/system/staff'
 
-// 全部数据（模拟后端数据库）
-const allData = [
-  { id: 1, staffName: '张明', gender: '男', department: '内科', jobTitle: '主任医师', education: '博士' },
-  { id: 2, staffName: '李芳', gender: '女', department: '外科', jobTitle: '副主任医师', education: '硕士' },
-  { id: 3, staffName: '王强', gender: '男', department: '儿科', jobTitle: '主治医师', education: '本科' },
-  { id: 4, staffName: '赵丽', gender: '女', department: '护理部', jobTitle: '护士长', education: '本科' },
-  { id: 5, staffName: '陈华', gender: '男', department: '放射科', jobTitle: '技师', education: '本科' },
-  { id: 6, staffName: '王明', gender: '男', department: '内科', jobTitle: '主治医师', education: '硕士' },
-  { id: 7, staffName: '刘芳', gender: '女', department: '儿科', jobTitle: '副主任医师', education: '博士' }
-]
+// 统计卡片
+const stats = ref([])
 
-const staffList = ref([])
+// 列表
+const list = ref([])
 const total = ref(0)
 const loading = ref(false)
 const single = ref(true)
@@ -88,123 +77,127 @@ const multiple = ref(true)
 const ids = ref([])
 const dialogVisible = ref(false)
 const dialogTitle = ref('')
-const queryParams = ref({ pageNum: 1, pageSize: 10, staffName: '' })
+const queryParams = ref({ pageNum: 1, pageSize: 10 })
 const form = ref({})
 const formRef = ref(null)
-const rules = { staffName: [{ required: true, message: '请填写姓名' }] }
+const rules = {}
 
-// 获取列表（带搜索过滤）
-const getList = () => {
-  loading.value = true
-
-  // 根据姓名筛选
-  let filteredData = [...allData]
-  if (queryParams.value.staffName) {
-    filteredData = allData.filter(item =>
-        item.staffName.includes(queryParams.value.staffName)
-    )
+// 加载统计卡片
+const loadSummary = async () => {
+  try {
+    const res = await getStaffSummary()
+    if (res.code === 200 && res.data) {
+      const d = res.data
+      const items = []
+      const titleMap = {
+        totalStaff: '总人员数', titleCount: '职称类别', categoryCount: '职业类别', deptCount: '科室数量', activeCount: '在职人数'
+      }
+      for (const [key, value] of Object.entries(d)) {
+        items.push({ key, title: titleMap[key] || key, value: value, unit: '' })
+      }
+      stats.value = items.slice(0, 4)
+    }
+  } catch (e) {
+    console.error('加载统计失败', e)
   }
+}
 
-  // 分页处理
-  const start = (queryParams.value.pageNum - 1) * queryParams.value.pageSize
-  const end = start + queryParams.value.pageSize
-  staffList.value = filteredData.slice(start, end)
-  total.value = filteredData.length
+// CRUD
+const getList = async () => {
+  loading.value = true
+  try {
+    const res = await listStaff(queryParams.value)
+    if (res.code === 200) {
+      list.value = res.rows || []
+      total.value = res.total || 0
+    }
+  } catch (e) {
+    console.error('查询列表失败', e)
+  }
   loading.value = false
 }
 
-// 搜索
-const handleQuery = () => {
-  queryParams.value.pageNum = 1
-  getList()
-}
-
-// 重置
-const resetQuery = () => {
-  queryParams.value.staffName = ''
-  queryParams.value.pageNum = 1
-  getList()
-}
-
-const handleSelectionChange = (selection) => {
-  ids.value = selection.map(item => item.id)
-  single.value = selection.length !== 1
-  multiple.value = !selection.length
-}
-
-const handleAdd = () => {
-  form.value = {}
-  dialogTitle.value = '添加人员'
-  dialogVisible.value = true
-}
-
-const handleUpdate = (row) => {
-  form.value = row ? { ...row } : {}
-  dialogTitle.value = '修改人员'
-  dialogVisible.value = true
-}
-
-const submitForm = () => {
-  formRef.value?.validate(valid => {
+const handleQuery = () => { queryParams.value.pageNum = 1; getList() }
+const resetQuery = () => { queryParams.value = { pageNum: 1, pageSize: 10 }; getList() }
+const handleSelectionChange = (selection) => { ids.value = selection.map(item => item.id); single.value = selection.length !== 1; multiple.value = !selection.length }
+const handleAdd = () => { form.value = {}; dialogTitle.value = '添加'; dialogVisible.value = true }
+const handleUpdate = (row) => { form.value = row ? { ...row } : {}; dialogTitle.value = '修改'; dialogVisible.value = true }
+const submitForm = async () => {
+  formRef.value?.validate(async (valid) => {
     if (valid) {
-      ElMessage.success('操作成功')
-      dialogVisible.value = false
-      getList()
+      try {
+        const res = form.value.id ? await updateStaff(form.value) : await addStaff(form.value)
+        if (res.code === 200) {
+          ElMessage.success('操作成功')
+          dialogVisible.value = false
+          getList()
+        }
+      } catch (e) {
+        console.error('保存失败', e)
+      }
     }
   })
 }
-
-const handleDelete = (row) => {
-  const id = row?.id || ids.value.join(',')
-  ElMessageBox.confirm('确认删除？').then(() => {
-    ElMessage.success('删除成功')
-    getList()
-  }).catch(() => {})
+const handleDelete = async (row) => {
+  const delIds = row?.id || ids.value.join(',')
+  try {
+    await ElMessageBox.confirm('确认删除？')
+    const res = await delStaff(delIds)
+    if (res.code === 200) {
+      ElMessage.success('删除成功')
+      getList()
+    }
+  } catch (e) {
+    if (e !== 'cancel') console.error('删除失败', e)
+  }
 }
 
-// 图表
+import { getStaffJobTitleDistribution, getStaffEducationDistribution } from '@/api/system/staff'
+
 const jobTitleChartRef = ref(null)
 const educationChartRef = ref(null)
 let jobTitleChart = null
 let educationChart = null
 
-const renderJobTitleChart = () => {
+const renderChart1 = async () => {
   if (!jobTitleChartRef.value) return
-  if (jobTitleChart) jobTitleChart.dispose()
-  jobTitleChart = echarts.init(jobTitleChartRef.value)
-  jobTitleChart.setOption({
-    tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
-    xAxis: { type: 'category', data: ['主任医师', '副主任医师', '主治医师', '住院医师', '护士', '医技人员'], axisLabel: { rotate: 30 } },
-    yAxis: { type: 'value', name: '人数' },
-    series: [{ type: 'bar', data: [156, 423, 892, 507, 2343, 885], itemStyle: { borderRadius: [4, 4, 0, 0], color: '#409EFF' } }]
-  })
+  try {
+    const res = await getStaffJobTitleDistribution()
+    const data = res.code === 200 ? (res.data || []) : []
+    if (jobTitleChart) jobTitleChart.dispose()
+    jobTitleChart = echarts.init(jobTitleChartRef.value)
+    jobTitleChart.setOption({
+      tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
+      grid: { left: '3%', right: '4%', bottom: '3%', containLabel: true },
+      xAxis: { type: 'category', data: data.map(d => d.name) || [] },
+      yAxis: { type: 'value', name: '人数' },
+      series: [{ type: 'bar', data: data.map(d => d.value) || [], itemStyle: { borderRadius: [4, 4, 0, 0], color: '#409EFF' } }]
+    })
+  } catch (e) { console.error('加载职称分布失败', e) }
 }
 
-const renderEducationChart = () => {
+const renderChart2 = async () => {
   if (!educationChartRef.value) return
-  if (educationChart) educationChart.dispose()
-  educationChart = echarts.init(educationChartRef.value)
-  educationChart.setOption({
-    tooltip: { trigger: 'item' },
-    legend: { orient: 'vertical', left: 'left' },
-    series: [{ type: 'pie', radius: '55%', data: [{ name: '博士', value: 124 }, { name: '硕士', value: 867 }, { name: '本科', value: 2341 }, { name: '大专', value: 1456 }, { name: '中专', value: 418 }], label: { show: true, formatter: '{b}: {d}%' } }]
-  })
+  try {
+    const res = await getStaffEducationDistribution()
+    const data = res.code === 200 ? (res.data || []) : []
+    if (educationChart) educationChart.dispose()
+    educationChart = echarts.init(educationChartRef.value)
+    educationChart.setOption({
+      tooltip: { trigger: 'item' },
+      legend: { orient: 'vertical', left: 'left' },
+      series: [{ type: 'pie', radius: '55%', data: data.length ? data : [{ name: '暂无数据', value: 1 }], label: { show: true, formatter: '{b}: {d}%' } }]
+    })
+  } catch (e) { console.error('加载学历分布失败', e) }
 }
 
-onMounted(() => {
+onMounted(async () => {
+  await loadSummary()
+  await Promise.all([renderChart1(), renderChart2()])
   getList()
-  renderJobTitleChart()
-  renderEducationChart()
-  window.addEventListener('resize', () => {
-    jobTitleChart?.resize()
-    educationChart?.resize()
-  })
+  window.addEventListener('resize', () => { jobTitleChart?.resize(); educationChart?.resize() })
 })
-
-onBeforeUnmount(() => {
-  jobTitleChart?.dispose()
-  educationChart?.dispose()
-})
+onBeforeUnmount(() => { jobTitleChart?.dispose(); educationChart?.dispose() })
 </script>
 
 <style scoped>
@@ -219,3 +212,5 @@ onBeforeUnmount(() => {
 .chart-row { margin-bottom: 20px; }
 .mb8 { margin-bottom: 8px; }
 </style>
+
+

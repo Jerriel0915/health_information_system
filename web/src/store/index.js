@@ -1,9 +1,7 @@
-import Vue from 'vue'
 import Vuex from 'vuex'
 import { getToken, setToken, removeToken } from '@/utils/auth'
 import { login, logout, getInfo } from '@/api/login'
 
-Vue.use(Vuex)
 
 const store = new Vuex.Store({
     state: {

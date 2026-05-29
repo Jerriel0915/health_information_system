@@ -1,4 +1,4 @@
-# 数据源配�?
+﻿# 数据源配�?
 spring:
     datasource:
         type: com.alibaba.druid.pool.DruidDataSource
@@ -6,9 +6,9 @@ spring:
         druid:
             # 主库数据�?
             master:
-                url: ${MYSQL_URL:jdbc:mysql://127.0.0.1:3306/ry-vue?useUnicode=true&characterEncoding=utf8&zeroDateTimeBehavior=convertToNull&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia%2FShanghai}
-                username: ${MYSQL_USERNAME:root}
-                password: ${MYSQL_PASSWORD:change-this-db-password}
+                url: jdbc:mysql://localhost:3306/health_data_manager?useUnicode=true&characterEncoding=utf8&zeroDateTimeBehavior=convertToNull&useSSL=true&serverTimezone=GMT%2B8
+                username: root
+                password: l123456789
             # 从库数据�?
             slave:
                 # 从数据源开�?默认关闭
@@ -40,15 +40,15 @@ spring:
             testOnBorrow: false
             testOnReturn: false
             webStatFilter: 
-                enabled: ${DRUID_WEB_STAT_FILTER_ENABLED:true}
+                enabled: true
             statViewServlet:
-                enabled: ${DRUID_STAT_VIEW_ENABLED:true}
+                enabled: true
                 # 设置白名单，不填则允许所有访�?
-                allow: ${DRUID_ALLOW:}
+                allow:
                 url-pattern: /druid/*
                 # 控制台管理用户名和密�?
-                login-username: ${DRUID_LOGIN_USERNAME:ruoyi}
-                login-password: ${DRUID_LOGIN_PASSWORD:change-this-druid-password}
+                login-username: ruoyi
+                login-password: 123456
             filter:
                 stat:
                     enabled: true
