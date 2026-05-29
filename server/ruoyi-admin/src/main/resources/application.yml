@@ -148,6 +148,20 @@ xss:
   # 过滤开关
   enabled: true
   # 排除链接（多个用逗号分隔）
-  excludes: /system/notice
+  excludes: /system/notice,/algorithm
   # 匹配链接
   urlPatterns: /system/*,/monitor/*,/tool/*
+
+
+# 算法模块配置
+algorithm:
+  # DeepSeek API 配置
+  deepseek-api-key: sk-0199dc5bd0c74b8b993b88cd32cf2034
+  deepseek-base-url: https://api.deepseek.com
+  deepseek-model: deepseek-chat
+  # 阿里云 DashScope 配置
+  dashscope-api-key: sk-3523ac04b39f45d88f7d9ac2c34cc4f4
+  asr-model: paraformer-v2
+  tts-model: sambert-zhiyuan-v1
+  tts-sample-rate: 48000
+  tts-format: wav
