@@ -1,9 +1,10 @@
-import { createApp } from 'vue'
+﻿import { createApp } from 'vue'
 import App from './App.vue'
 import router from './router'
 import ElementPlus from 'element-plus'
 import 'element-plus/dist/index.css'
 import * as echarts from 'echarts'
+import store from '@/store'
 
 const app = createApp(App)
 
@@ -12,6 +13,9 @@ app.use(ElementPlus)
 
 // 使用路由
 app.use(router)
+
+// 使用 Vuex Store
+app.use(store)
 
 // 全局挂载 echarts
 app.config.globalProperties.$echarts = echarts
