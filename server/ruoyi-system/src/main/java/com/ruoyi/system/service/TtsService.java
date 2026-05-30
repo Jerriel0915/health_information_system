@@ -36,15 +36,11 @@ public class TtsService
      */
     public byte[] synthesize(String text) throws NoApiKeyException
     {
-        // 设置 API Key（也可以通过环境变量 DASHSCOPE_API_KEY）
-        if (config.getDashscopeApiKey() != null && !config.getDashscopeApiKey().isEmpty())
-        {
-            System.setProperty("dashscope.api.key", config.getDashscopeApiKey());
-        }
 
         // 构建合成参数
         SpeechSynthesisParam param = SpeechSynthesisParam.builder()
                 .model(config.getTtsModel())
+                .apiKey(config.getDashscopeApiKey())
                 .text(text)
                 .sampleRate(config.getTtsSampleRate())
                 .format(SpeechSynthesisAudioFormat.WAV)

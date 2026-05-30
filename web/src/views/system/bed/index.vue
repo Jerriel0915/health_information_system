@@ -1,16 +1,7 @@
-<template>
+﻿<template>
   <div class="page-container">
     <!-- 统计卡片 -->
-    <el-row :gutter="16" class="stat-cards">
-      <el-col :span="6" v-for="item in stats" :key="item.title">
-        <el-card shadow="hover" class="stat-card">
-          <div class="stat-card-inner">
-            <div class="stat-title">{{ item.title }}</div>
-            <div class="stat-value">{{ formatNumber(item.value) }}<span class="unit">{{ item.unit }}</span></div>
-          </div>
-        </el-card>
-      </el-col>
-    </el-row>
+    <el-row :gutter="16" class="stat-cards"><el-col :span="6" v-for="stat in stats" :key="stat.key"><el-card shadow="hover" class="stat-card"><div class="stat-card-inner"><div class="stat-title">{{ stat.title }}</div><div class="stat-value">{{ stat.value }}<span class="unit">{{ stat.unit }}</span></div></div></el-card></el-col></el-row>
 
     <!-- 图表区域 -->
     <el-row :gutter="16" class="chart-row">
@@ -41,11 +32,11 @@
       <el-col :span="1.5"><el-button type="primary" plain @click="handleAdd">新增</el-button></el-col>
       <el-col :span="1.5"><el-button type="success" plain :disabled="single" @click="handleUpdate">修改</el-button></el-col>
       <el-col :span="1.5"><el-button type="danger" plain :disabled="multiple" @click="handleDelete">删除</el-button></el-col>
-      <right-toolbar v-model:showSearch="showSearch" @queryTable="getList" />
+      
     </el-row>
 
     <!-- 数据表格 -->
-    <el-table v-loading="loading" :data="bedList" @selection-change="handleSelectionChange">
+    <el-table v-loading="loading" :data="list" @selection-change="handleSelectionChange">
       <el-table-column type="selection" width="55" align="center" />
       <el-table-column label="序号" prop="id" width="80" />
       <el-table-column label="机构ID" prop="orgId" />
@@ -81,76 +72,144 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, onBeforeUnmount } from 'vue'
+import { ref, onMounted, onBeforeUnmount } from 'vue'
+const showSearch = ref(true)
 import { ElMessage, ElMessageBox } from 'element-plus'
 import * as echarts from 'echarts'
+import { listBed, addBed, updateBed, delBed, getBedSummary } from '@/api/system/bed'
 
-// 统计数据
-const stats = ref([
-  { title: '床位总数', value: 140710, unit: '张' },
-  { title: '实际开放床位', value: 133904, unit: '张' },
-  { title: '使用床位', value: 82733, unit: '张' },
-  { title: '平均使用率', value: 61.79, unit: '%' }
-])
+// 统计卡片
+const stats = ref([])
 
-// 图表
-const deptChartRef = ref(null)
-const trendChartRef = ref(null)
-let deptChart = null
-let trendChart = null
-
-const renderDeptChart = () => {
-  if (!deptChartRef.value) return
-  if (deptChart) deptChart.dispose()
-  deptChart = echarts.init(deptChartRef.value)
-  deptChart.setOption({
-    tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
-    xAxis: { type: 'category', data: ['内科', '外科', '儿科', '妇产科', '急诊科', 'ICU'], axisLabel: { rotate: 30 } },
-    yAxis: { type: 'value', name: '床位数' },
-    series: [{ type: 'bar', data: [2850, 2340, 1200, 1800, 890, 450], itemStyle: { borderRadius: [4, 4, 0, 0], color: '#409EFF' } }]
-  })
-}
-
-const renderTrendChart = () => {
-  if (!trendChartRef.value) return
-  if (trendChart) trendChart.dispose()
-  trendChart = echarts.init(trendChartRef.value)
-  trendChart.setOption({
-    tooltip: { trigger: 'axis' },
-    xAxis: { type: 'category', data: ['2021', '2022', '2023', '2024', '2025'], name: '年份' },
-    yAxis: { type: 'value', name: '床位数' },
-    series: [{ type: 'line', data: [125000, 130000, 135000, 138000, 140710], smooth: true, lineStyle: { color: '#67C23A', width: 3 }, areaStyle: { opacity: 0.3 } }]
-  })
-}
-
-// 表格数据
-const loading = ref(false)
-const bedList = ref([])
+// 列表
+const list = ref([])
 const total = ref(0)
-const showSearch = ref(true)
+const loading = ref(false)
 const single = ref(true)
 const multiple = ref(true)
 const ids = ref([])
 const dialogVisible = ref(false)
 const dialogTitle = ref('')
-const queryParams = reactive({ pageNum: 1, pageSize: 10, orgId: '', deptType: '', statYear: '' })
+const queryParams = ref({ pageNum: 1, pageSize: 10 })
 const form = ref({})
 const formRef = ref(null)
-const queryFormRef = ref(null)
+const rules = {}
 
-const rules = { orgId: [{ required: true, message: '机构ID不能为空', trigger: 'blur' }], bedCount: [{ required: true, message: '床位总数不能为空', trigger: 'blur' }] }
+// 加载统计卡片
+const loadSummary = async () => {
+  try {
+    const res = await getBedSummary()
+    if (res.code === 200 && res.data) {
+      const d = res.data
+      const items = []
+      const titleMap = {
+        totalBedCount: '总床位数', totalActualBedCount: '实际开放', totalUsedBedCount: '使用床位', avgUsageRate: '床位使用率(%)'
+      }
+      for (const [key, value] of Object.entries(d)) {
+        items.push({ key, title: titleMap[key] || key, value: value, unit: '' })
+      }
+      stats.value = items.slice(0, 4)
+    }
+  } catch (e) {
+    console.error('加载统计失败', e)
+  }
+}
 
-const formatNumber = (val) => { if (!val) return 0; if (val >= 10000) return (val / 10000).toFixed(1) + '万'; return val.toLocaleString() }
-const getList = () => { loading.value = true; setTimeout(() => { bedList.value = []; loading.value = false; total.value = 0 }, 500) }
-const handleQuery = () => { queryParams.pageNum = 1; getList() }
-const resetQuery = () => { queryFormRef.value?.resetFields(); handleQuery() }
+// CRUD
+const getList = async () => {
+  loading.value = true
+  try {
+    const res = await listBed(queryParams.value)
+    if (res.code === 200) {
+      list.value = res.rows || []
+      total.value = res.total || 0
+    }
+  } catch (e) {
+    console.error('查询列表失败', e)
+  }
+  loading.value = false
+}
+
+const handleQuery = () => { queryParams.value.pageNum = 1; getList() }
+const resetQuery = () => { queryParams.value = { pageNum: 1, pageSize: 10 }; getList() }
 const handleSelectionChange = (selection) => { ids.value = selection.map(item => item.id); single.value = selection.length !== 1; multiple.value = !selection.length }
-const handleAdd = () => { form.value = {}; dialogTitle.value = '添加床位'; dialogVisible.value = true }
-const handleUpdate = (row) => { form.value = row || {}; dialogTitle.value = '修改床位'; dialogVisible.value = true }
-const submitForm = () => { formRef.value?.validate(valid => { if (valid) { ElMessage.success('操作成功'); dialogVisible.value = false; getList() } }) }
-const handleDelete = (row) => { const id = row?.id || ids.value.join(','); ElMessageBox.confirm('确认删除？').then(() => { ElMessage.success('删除成功'); getList() }).catch(() => {}) }
+const handleAdd = () => { form.value = {}; dialogTitle.value = '添加'; dialogVisible.value = true }
+const handleUpdate = (row) => { form.value = row ? { ...row } : {}; dialogTitle.value = '修改'; dialogVisible.value = true }
+const submitForm = async () => {
+  formRef.value?.validate(async (valid) => {
+    if (valid) {
+      try {
+        const res = form.value.id ? await updateBed(form.value) : await addBed(form.value)
+        if (res.code === 200) {
+          ElMessage.success('操作成功')
+          dialogVisible.value = false
+          getList()
+        }
+      } catch (e) {
+        console.error('保存失败', e)
+      }
+    }
+  })
+}
+const handleDelete = async (row) => {
+  const delIds = row?.id || ids.value.join(',')
+  try {
+    await ElMessageBox.confirm('确认删除？')
+    const res = await delBed(delIds)
+    if (res.code === 200) {
+      ElMessage.success('删除成功')
+      getList()
+    }
+  } catch (e) {
+    if (e !== 'cancel') console.error('删除失败', e)
+  }
+}
 
-onMounted(() => { getList(); renderDeptChart(); renderTrendChart(); window.addEventListener('resize', () => { deptChart?.resize(); trendChart?.resize() }) })
+import { getBedDeptDistribution, getBedTrend } from '@/api/system/bed'
+
+const deptChartRef = ref(null)
+const trendChartRef = ref(null)
+let deptChart = null
+let trendChart = null
+
+const renderChart1 = async () => {
+  if (!deptChartRef.value) return
+  try {
+    const res = await getBedDeptDistribution()
+    const data = res.code === 200 ? (res.data || []) : []
+    if (deptChart) deptChart.dispose()
+    deptChart = echarts.init(deptChartRef.value)
+    deptChart.setOption({
+      tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
+      xAxis: { type: 'category', data: data.map(d => d.name) || [] },
+      yAxis: { type: 'value', name: '床位数' },
+      series: [{ type: 'bar', data: data.map(d => d.value) || [], itemStyle: { borderRadius: [4, 4, 0, 0], color: '#409EFF' } }]
+    })
+  } catch (e) { console.error('加载科室分布失败', e) }
+}
+
+const renderChart2 = async () => {
+  if (!trendChartRef.value) return
+  try {
+    const res = await getBedTrend()
+    const data = res.code === 200 ? (res.data || []) : []
+    if (trendChart) trendChart.dispose()
+    trendChart = echarts.init(trendChartRef.value)
+    trendChart.setOption({
+      tooltip: { trigger: 'axis' },
+      xAxis: { type: 'category', data: data.map(d => d.year || d.name) || [], name: '年份' },
+      yAxis: { type: 'value', name: '床位数' },
+      series: [{ type: 'line', data: data.map(d => d.bedCount || d.value) || [], smooth: true, lineStyle: { color: '#67C23A', width: 3 }, areaStyle: { opacity: 0.3 } }]
+    })
+  } catch (e) { console.error('加载床位趋势失败', e) }
+}
+
+onMounted(async () => {
+  await loadSummary()
+  await Promise.all([renderChart1(), renderChart2()])
+  getList()
+  window.addEventListener('resize', () => { deptChart?.resize(); trendChart?.resize() })
+})
 onBeforeUnmount(() => { deptChart?.dispose(); trendChart?.dispose() })
 </script>
 
@@ -166,3 +225,6 @@ onBeforeUnmount(() => { deptChart?.dispose(); trendChart?.dispose() })
 .chart-row { margin-bottom: 20px; }
 .mb8 { margin-bottom: 8px; }
 </style>
+
+
+

@@ -1,9 +1,11 @@
 package com.ruoyi.web.controller;
 
 import com.ruoyi.common.core.controller.BaseController;
+import com.ruoyi.system.domain.ChatMessage;
 import com.ruoyi.common.core.domain.AjaxResult;
 import com.ruoyi.system.service.AsrService;
 import com.ruoyi.system.service.ChatService;
+import com.ruoyi.system.service.ChatSessionService;
 import com.ruoyi.system.service.TtsService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -28,13 +30,15 @@ public class AlgorithmController extends BaseController
 
     private final AsrService asrService;
     private final ChatService chatService;
+    private final ChatSessionService chatSessionService;
     private final TtsService ttsService;
 
-    public AlgorithmController(AsrService asrService, ChatService chatService, TtsService ttsService)
+    public AlgorithmController(AsrService asrService, ChatService chatService, TtsService ttsService, ChatSessionService chatSessionService)
     {
         this.asrService = asrService;
         this.chatService = chatService;
         this.ttsService = ttsService;
+        this.chatSessionService = chatSessionService;
     }
 
     /**
@@ -44,14 +48,35 @@ public class AlgorithmController extends BaseController
      * 返回: { "msg": "回答内容", "code": 200 }
      */
     @PostMapping("/chat")
-    public AjaxResult chat(@RequestBody Map<String, String> body)
+    public AjaxResult chat(@RequestBody Map<String, Object> body)
     {
-        String question = body != null ? body.get("question") : null;
-        if (question == null || question.trim().isEmpty())
-        {
-            return error("问题不能为空");
+        if (body == null) return error("参数不能为空");
+        String sessionId = (String) body.get("sessionId");
+        String question = (String) body.get("question");
+        if (question == null || question.trim().isEmpty()) return error("问题不能为空");
+
+        // 保存用户消息
+        if (sessionId != null) {
+            chatSessionService.saveMessage(sessionId, "user", question.trim());
         }
-        String answer = chatService.chat(question.trim());
+
+        // 获取历史消息
+        java.util.List<ChatMessage> history = null;
+        if (sessionId != null) {
+            history = chatSessionService.getHistory(sessionId);
+            if (history.size() > 20) {
+                history = history.subList(history.size() - 20, history.size());
+            }
+        }
+
+        // 调用 DeepSeek
+        String answer = chatService.chat(question.trim(), history);
+
+        // 保存回答
+        if (sessionId != null) {
+            chatSessionService.saveMessage(sessionId, "assistant", answer);
+        }
+
         return success(answer);
     }
 
@@ -61,6 +86,41 @@ public class AlgorithmController extends BaseController
      * 接收音频文件，返回识别文本
      * 返回: { "msg": "识别文本", "code": 200 }
      */
+
+    @PostMapping("/chat/sessions")
+    public AjaxResult getSessions(@RequestBody Map<String, Object> body)
+    {
+        Long userId = body != null ? Long.valueOf(body.get("userId").toString()) : null;
+        if (userId == null) return error("\u7528\u6237ID\u4e0d\u80fd\u4e3a\u7a7a");
+        return success(chatSessionService.getSessionList(userId));
+    }
+
+    @PostMapping("/chat/session/create")
+    public AjaxResult createSession(@RequestBody Map<String, Object> body)
+    {
+        Long userId = body != null ? Long.valueOf(body.get("userId").toString()) : null;
+        if (userId == null) return error("\u7528\u6237ID\u4e0d\u80fd\u4e3a\u7a7a");
+        String sessionId = chatSessionService.createSession(userId);
+        return success(sessionId);
+    }
+
+    @PostMapping("/chat/session/delete")
+    public AjaxResult deleteSession(@RequestBody Map<String, Object> body)
+    {
+        String sessionId = body != null ? (String) body.get("sessionId") : null;
+        if (sessionId == null) return error("\u4f1a\u8bddID\u4e0d\u80fd\u4e3a\u7a7a");
+        chatSessionService.deleteSession(sessionId);
+        return success();
+    }
+
+    @PostMapping("/chat/history")
+    public AjaxResult getHistory(@RequestBody Map<String, Object> body)
+    {
+        String sessionId = body != null ? (String) body.get("sessionId") : null;
+        if (sessionId == null) return error("\u4f1a\u8bddID\u4e0d\u80fd\u4e3a\u7a7a");
+        return success(chatSessionService.getHistory(sessionId));
+    }
+
     @PostMapping("/asr")
     public AjaxResult asr(@RequestParam("file") MultipartFile file)
     {
@@ -138,7 +198,7 @@ public class AlgorithmController extends BaseController
 
             // Step 2: DeepSeek 对话
             log.info("Pipeline Step 2: 大模型对话开始");
-            String answer = chatService.chat(question);
+            String answer = chatService.chat(question, null);
             log.info("Pipeline Step 2: 大模型回答完成，长度: {}", answer.length());
 
             // Step 3: TTS 语音合成

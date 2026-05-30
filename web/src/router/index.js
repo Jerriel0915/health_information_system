@@ -1,4 +1,4 @@
-import { createRouter, createWebHashHistory } from 'vue-router'
+﻿import { createRouter, createWebHashHistory } from 'vue-router'
 import Layout from '@/layout/index.vue'
 
 const routes = [
@@ -126,7 +126,8 @@ const router = createRouter({
 
 // 路由守卫：如果没有登录，跳转到登录页
 router.beforeEach((to, from, next) => {
-    const token = localStorage.getItem('token')
+    const m = document.cookie.match(/(?:^| )Admin-Token=([^;]*)/)
+    const token = m ? m[1] : null
 
     if (to.path === '/login') {
         next()
@@ -140,3 +141,4 @@ router.beforeEach((to, from, next) => {
 })
 
 export default router
+

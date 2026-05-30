@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="page-container">
     <!-- 统计卡片 -->
     <el-row :gutter="16" class="stat-cards">
@@ -54,7 +54,7 @@
     </el-row>
 
     <!-- 数据表格 -->
-    <el-table v-loading="loading" :data="institutionList" @selection-change="handleSelectionChange">
+    <el-table v-loading="loading" :data="list" @selection-change="handleSelectionChange">
       <el-table-column type="selection" width="55" />
       <el-table-column label="序号" prop="id" width="80" />
       <el-table-column label="机构编码" prop="orgCode" />
@@ -89,16 +89,14 @@
 import { ref, onMounted, onBeforeUnmount } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import * as echarts from 'echarts'
+import { listInstitution, addInstitution, updateInstitution, delInstitution, getInstitutionSummary, getInstitutionTypeDistribution, getInstitutionLevelDistribution } from '@/api/system/institution'
 
-// 模拟数据
-const institutionList = ref([
-  { id: 1, orgCode: '1001', orgName: '市第一人民医院', orgType: '综合医院', orgLevel: '三级甲等', address: '解放路1号', contactPhone: '12345678' },
-  { id: 2, orgCode: '1002', orgName: '市第二人民医院', orgType: '综合医院', orgLevel: '三级乙等', address: '建设路2号', contactPhone: '12345679' },
-  { id: 3, orgCode: '1003', orgName: '市中医院', orgType: '中医医院', orgLevel: '三级甲等', address: '中医路3号', contactPhone: '12345680' },
-  { id: 4, orgCode: '1004', orgName: '市妇幼保健院', orgType: '专科医院', orgLevel: '三级乙等', address: '妇幼路4号', contactPhone: '12345681' },
-  { id: 5, orgCode: '1005', orgName: '仁爱医院', orgType: '民营医院', orgLevel: '二级甲等', address: '民营路5号', contactPhone: '12345682' }
-])
-const total = ref(5)
+// 统计卡片
+const stats = ref([])
+
+// 列表
+const list = ref([])
+const total = ref(0)
 const loading = ref(false)
 const single = ref(true)
 const multiple = ref(true)
@@ -116,39 +114,104 @@ const levelChartRef = ref(null)
 let typeChart = null
 let levelChart = null
 
-const renderTypeChart = () => {
+// 加载统计
+const loadSummary = async () => {
+  try {
+    const res = await getInstitutionSummary()
+    if (res.code === 200 && res.data) {
+      const d = res.data
+      stats.value = [
+        { key: 'total', title: '机构总数', value: d.totalInstitutions || 0, unit: '家' },
+        { key: 'type', title: '机构类型', value: d.typeCount || 0, unit: '种' },
+        { key: 'level', title: '机构等级', value: d.levelCount || 0, unit: '种' },
+        { key: 'active', title: '启用机构', value: d.activeCount || 0, unit: '家' }
+      ]
+    }
+  } catch (e) { console.error('加载机构统计失败', e) }
+}
+
+// 图表渲染
+const renderTypeChart = async () => {
   if (!typeChartRef.value) return
-  if (typeChart) typeChart.dispose()
-  typeChart = echarts.init(typeChartRef.value)
-  typeChart.setOption({
-    tooltip: { trigger: 'item' },
-    legend: { orient: 'vertical', left: 'left' },
-    series: [{ type: 'pie', radius: '55%', data: [{ name: '综合医院', value: 42 }, { name: '专科医院', value: 18 }, { name: '社区卫生服务中心', value: 12 }, { name: '乡镇卫生院', value: 6 }], label: { show: true, formatter: '{b}: {d}%' } }]
-  })
+  try {
+    const res = await getInstitutionTypeDistribution()
+    const data = res.code === 200 ? (res.data || []) : []
+    if (typeChart) typeChart.dispose()
+    typeChart = echarts.init(typeChartRef.value)
+    typeChart.setOption({
+      tooltip: { trigger: 'item' },
+      legend: { orient: 'vertical', left: 'left' },
+      series: [{ type: 'pie', radius: '55%', data: data.length ? data : [{ name: '暂无数据', value: 1 }], label: { show: true, formatter: '{b}: {d}%' } }]
+    })
+  } catch (e) { console.error('加载机构类型分布失败', e) }
 }
 
-const renderLevelChart = () => {
+const renderLevelChart = async () => {
   if (!levelChartRef.value) return
-  if (levelChart) levelChart.dispose()
-  levelChart = echarts.init(levelChartRef.value)
-  levelChart.setOption({
-    tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
-    xAxis: { type: 'category', data: ['三级甲等', '三级乙等', '二级甲等', '二级乙等', '一级'] },
-    yAxis: { type: 'value', name: '数量' },
-    series: [{ type: 'bar', data: [12, 8, 15, 10, 33], itemStyle: { borderRadius: [4, 4, 0, 0], color: '#409EFF' } }]
-  })
+  try {
+    const res = await getInstitutionLevelDistribution()
+    const data = res.code === 200 ? (res.data || []) : []
+    if (levelChart) levelChart.dispose()
+    levelChart = echarts.init(levelChartRef.value)
+    levelChart.setOption({
+      tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
+      xAxis: { type: 'category', data: data.map(d => d.name) || [] },
+      yAxis: { type: 'value', name: '数量' },
+      series: [{ type: 'bar', data: data.map(d => d.value) || [], itemStyle: { borderRadius: [4, 4, 0, 0], color: '#409EFF' } }]
+    })
+  } catch (e) { console.error('加载机构等级分布失败', e) }
 }
 
-const getList = () => { loading.value = false }
-const handleQuery = () => { getList() }
-const resetQuery = () => { queryParams.value.orgName = ''; getList() }
+// CRUD
+const getList = async () => {
+  loading.value = true
+  try {
+    const res = await listInstitution(queryParams.value)
+    if (res.code === 200) {
+      list.value = res.rows || []
+      total.value = res.total || 0
+    }
+  } catch (e) { console.error('查询机构列表失败', e) }
+  loading.value = false
+}
+
+const handleQuery = () => { queryParams.value.pageNum = 1; getList() }
+const resetQuery = () => { queryParams.value.orgName = ''; queryParams.value.pageNum = 1; getList() }
 const handleSelectionChange = (selection) => { ids.value = selection.map(item => item.id); single.value = selection.length !== 1; multiple.value = !selection.length }
 const handleAdd = () => { form.value = {}; dialogTitle.value = '添加机构'; dialogVisible.value = true }
-const handleUpdate = (row) => { form.value = row || {}; dialogTitle.value = '修改机构'; dialogVisible.value = true }
-const submitForm = () => { formRef.value?.validate(valid => { if (valid) { ElMessage.success('操作成功'); dialogVisible.value = false; getList() } }) }
-const handleDelete = (row) => { const id = row?.id || ids.value.join(','); ElMessageBox.confirm('确认删除？').then(() => { ElMessage.success('删除成功'); getList() }).catch(() => {}) }
+const handleUpdate = (row) => { form.value = row ? { ...row } : {}; dialogTitle.value = '修改机构'; dialogVisible.value = true }
+const submitForm = async () => {
+  formRef.value?.validate(async (valid) => {
+    if (valid) {
+      try {
+        const res = form.value.id ? await updateInstitution(form.value) : await addInstitution(form.value)
+        if (res.code === 200) {
+          ElMessage.success('操作成功')
+          dialogVisible.value = false
+          getList()
+        }
+      } catch (e) { console.error('保存机构失败', e) }
+    }
+  })
+}
+const handleDelete = async (row) => {
+  const delIds = row?.id || ids.value.join(',')
+  try {
+    await ElMessageBox.confirm('确认删除？')
+    const res = await delInstitution(delIds)
+    if (res.code === 200) {
+      ElMessage.success('删除成功')
+      getList()
+    }
+  } catch (e) { if (e !== 'cancel') console.error('删除机构失败', e) }
+}
 
-onMounted(() => { renderTypeChart(); renderLevelChart(); window.addEventListener('resize', () => { typeChart?.resize(); levelChart?.resize() }) })
+onMounted(async () => {
+  await loadSummary()
+  await Promise.all([renderTypeChart(), renderLevelChart()])
+  getList()
+  window.addEventListener('resize', () => { typeChart?.resize(); levelChart?.resize() })
+})
 onBeforeUnmount(() => { typeChart?.dispose(); levelChart?.dispose() })
 </script>
 
@@ -164,3 +227,4 @@ onBeforeUnmount(() => { typeChart?.dispose(); levelChart?.dispose() })
 .chart-row { margin-bottom: 20px; }
 .mb8 { margin-bottom: 8px; }
 </style>
+
