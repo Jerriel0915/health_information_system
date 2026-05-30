@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="login-container">
     <div class="login-box">
       <div class="login-title">
@@ -44,14 +44,16 @@
 </template>
 
 <script setup>
-import { reactive, ref } from 'vue'
+import { reactive, ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
+import { setToken } from '@/utils/auth'
 
 const router = useRouter()
 const loginFormRef = ref(null)
 
-// 使用 reactive 代替 ref 解决输入问题
+console.log('[Login] 组件已加载')
+
 const loginForm = reactive({
   username: 'admin',
   password: 'admin123'
@@ -65,19 +67,40 @@ const rules = {
 const loading = ref(false)
 
 const handleLogin = () => {
-  loginFormRef.value?.validate((valid) => {
+  console.log('[Login] handleLogin 被点击了')
+  loginFormRef.value?.validate(async (valid) => {
+    console.log('[Login] validate 结果:', valid)
     if (valid) {
-      if (loginForm.username === 'admin' && loginForm.password === 'admin123') {
-        loading.value = true
-        setTimeout(() => {
-          localStorage.setItem('token', 'mock-token-123')
-          localStorage.setItem('username', loginForm.username)
+      loading.value = true
+      try {
+        console.log('[Login] 开始调登录接口...')
+        const res = await fetch('/dev-api/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            username: loginForm.username,
+            password: loginForm.password,
+            code: '',
+            uuid: ''
+          })
+        })
+        const data = await res.json()
+        console.log('[Login] API 返回:', JSON.stringify(data))
+        if (data.code === 200 && data.token) {
+          console.log('[Login] 写入 token:', data.token.substring(0, 20) + '...')
+          setToken(data.token)
+          console.log('[Login] token 已写入 cookie')
           ElMessage.success('登录成功')
           router.push('/dashboard')
-          loading.value = false
-        }, 500)
-      } else {
-        ElMessage.error('用户名或密码错误')
+        } else {
+          console.warn('[Login] 登录失败, 返回数据:', data)
+          ElMessage.error(data.msg || '登录失败')
+        }
+      } catch (e) {
+        console.error('[Login] 异常:', e)
+        ElMessage.error(e.message || '登录失败')
+      } finally {
+        loading.value = false
       }
     }
   })
@@ -125,3 +148,6 @@ const handleLogin = () => {
   font-size: 12px;
 }
 </style>
+
+
+

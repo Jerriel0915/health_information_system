@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="page-container">
     <el-row :gutter="16" class="stat-cards">
       <el-col :span="6" v-for="item in stats" :key="item.title">
@@ -16,9 +16,9 @@
       <el-form-item><el-button type="primary" @click="handleQuery">搜索</el-button><el-button @click="resetQuery">重置</el-button></el-form-item>
     </el-form>
 
-    <el-row :gutter="10" class="mb8"><el-col :span="1.5"><el-button type="primary" plain @click="handleAdd">新增</el-button></el-col><el-col :span="1.5"><el-button type="success" plain :disabled="single" @click="handleUpdate">修改</el-button></el-col><el-col :span="1.5"><el-button type="danger" plain :disabled="multiple" @click="handleDelete">删除</el-button></el-col><right-toolbar v-model:showSearch="showSearch" @queryTable="getList" /></el-row>
+    <el-row :gutter="10" class="mb8"><el-col :span="1.5"><el-button type="primary" plain @click="handleAdd">新增</el-button></el-col><el-col :span="1.5"><el-button type="success" plain :disabled="single" @click="handleUpdate">修改</el-button></el-col><el-col :span="1.5"><el-button type="danger" plain :disabled="multiple" @click="handleDelete">删除</el-button></el-col></el-row>
 
-    <el-table v-loading="loading" :data="serviceList" @selection-change="handleSelectionChange">
+    <el-table v-loading="loading" :data="list" @selection-change="handleSelectionChange">
       <el-table-column type="selection" width="55" /><el-table-column label="序号" prop="id" width="80" /><el-table-column label="患者姓名" prop="patientName" /><el-table-column label="性别" prop="patientGender" /><el-table-column label="年龄" prop="patientAge" /><el-table-column label="服务类型" prop="serviceType" /><el-table-column label="科室" prop="department" /><el-table-column label="诊断名称" prop="diagnosisName" show-overflow-tooltip /><el-table-column label="操作" width="150"><template #default="{ row }"><el-button link type="primary" size="small" @click="handleUpdate(row)">编辑</el-button><el-button link type="danger" size="small" @click="handleDelete(row)">删除</el-button></template></el-table-column>
     </el-table>
     <pagination v-show="total>0" v-model:page="queryParams.pageNum" v-model:limit="queryParams.pageSize" :total="total" @pagination="getList" />
@@ -38,33 +38,153 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, onBeforeUnmount } from 'vue'
+import { ref, onMounted, onBeforeUnmount } from 'vue'
+const showSearch = ref(true)
 import { ElMessage, ElMessageBox } from 'element-plus'
 import * as echarts from 'echarts'
+import { listService, addService, updateService, delService, getServiceSummary } from '@/api/system/service'
 
-const stats = ref([{ title: '服务总量', value: 50000, unit: '人次' }, { title: '门诊服务量', value: 32500, unit: '人次' }, { title: '住院服务量', value: 17500, unit: '人次' }, { title: '平均住院天数', value: 8.5, unit: '天' }])
+// 统计卡片
+const stats = ref([])
 
-const typeChartRef = ref(null); const trendChartRef = ref(null); let typeChart = null; let trendChart = null
-const renderTypeChart = () => { if (!typeChartRef.value) return; if (typeChart) typeChart.dispose(); typeChart = echarts.init(typeChartRef.value); typeChart.setOption({ tooltip: { trigger: 'item' }, legend: { orient: 'vertical', left: 'left' }, series: [{ type: 'pie', radius: '55%', data: [{ name: '门诊', value: 32500 }, { name: '住院', value: 17500 }], label: { show: true, formatter: '{b}: {d}%' } }] }) }
-const renderTrendChart = () => { if (!trendChartRef.value) return; if (trendChart) trendChart.dispose(); trendChart = echarts.init(trendChartRef.value); trendChart.setOption({ tooltip: { trigger: 'axis' }, xAxis: { type: 'category', data: ['2021', '2022', '2023', '2024', '2025'] }, yAxis: { type: 'value', name: '服务量' }, series: [{ type: 'line', data: [42000, 44500, 46800, 49200, 50000], smooth: true, lineStyle: { color: '#67C23A', width: 3 }, areaStyle: { opacity: 0.3 } }] }) }
+// 列表
+const list = ref([])
+const total = ref(0)
+const loading = ref(false)
+const single = ref(true)
+const multiple = ref(true)
+const ids = ref([])
+const dialogVisible = ref(false)
+const dialogTitle = ref('')
+const queryParams = ref({ pageNum: 1, pageSize: 10 })
+const form = ref({})
+const formRef = ref(null)
+const rules = {}
 
-const formatNumber = (val) => { if (!val) return 0; if (val >= 10000) return (val / 10000).toFixed(1) + '万'; return val.toLocaleString() }
+// 加载统计卡片
+const loadSummary = async () => {
+  try {
+    const res = await getServiceSummary()
+    if (res.code === 200 && res.data) {
+      const d = res.data
+      const items = []
+      const titleMap = {
+        totalServices: '服务总数', typeCount: '服务类型', outpatientCount: '门诊次数', inpatientCount: '住院次数', avgDaysInHospital: '平均住院天数'
+      }
+      for (const [key, value] of Object.entries(d)) {
+        items.push({ key, title: titleMap[key] || key, value: value, unit: '' })
+      }
+      stats.value = items.slice(0, 4)
+    }
+  } catch (e) {
+    console.error('加载统计失败', e)
+  }
+}
 
-const loading = ref(false); const serviceList = ref([]); const total = ref(0); const showSearch = ref(true); const single = ref(true); const multiple = ref(true); const ids = ref([]); const dialogVisible = ref(false); const dialogTitle = ref('')
-const queryParams = reactive({ pageNum: 1, pageSize: 10, patientName: '' })
-const form = ref({}); const formRef = ref(null); const queryFormRef = ref(null)
-const rules = { patientName: [{ required: true, message: '请填写患者姓名' }] }
+// CRUD
+const getList = async () => {
+  loading.value = true
+  try {
+    const res = await listService(queryParams.value)
+    if (res.code === 200) {
+      list.value = res.rows || []
+      total.value = res.total || 0
+    }
+  } catch (e) {
+    console.error('查询列表失败', e)
+  }
+  loading.value = false
+}
 
-const getList = () => { loading.value = true; setTimeout(() => { serviceList.value = [{ id: 1, patientName: '张三', patientGender: '男', patientAge: 45, serviceType: '门诊', department: '内科', diagnosisName: '高血压' }]; total.value = 1; loading.value = false }, 500) }
-const handleQuery = () => { queryParams.pageNum = 1; getList() }
-const resetQuery = () => { queryFormRef.value?.resetFields(); handleQuery() }
+const handleQuery = () => { queryParams.value.pageNum = 1; getList() }
+const resetQuery = () => { queryParams.value = { pageNum: 1, pageSize: 10 }; getList() }
 const handleSelectionChange = (selection) => { ids.value = selection.map(item => item.id); single.value = selection.length !== 1; multiple.value = !selection.length }
-const handleAdd = () => { form.value = {}; dialogTitle.value = '添加服务记录'; dialogVisible.value = true }
-const handleUpdate = (row) => { form.value = row || {}; dialogTitle.value = '修改服务记录'; dialogVisible.value = true }
-const submitForm = () => { formRef.value?.validate(valid => { if (valid) { ElMessage.success('操作成功'); dialogVisible.value = false; getList() } }) }
-const handleDelete = (row) => { const id = row?.id || ids.value.join(','); ElMessageBox.confirm('确认删除？').then(() => { ElMessage.success('删除成功'); getList() }).catch(() => {}) }
+const handleAdd = () => { form.value = {}; dialogTitle.value = '添加'; dialogVisible.value = true }
+const handleUpdate = (row) => { form.value = row ? { ...row } : {}; dialogTitle.value = '修改'; dialogVisible.value = true }
+const submitForm = async () => {
+  formRef.value?.validate(async (valid) => {
+    if (valid) {
+      try {
+        const res = form.value.id ? await updateService(form.value) : await addService(form.value)
+        if (res.code === 200) {
+          ElMessage.success('操作成功')
+          dialogVisible.value = false
+          getList()
+        }
+      } catch (e) {
+        console.error('保存失败', e)
+      }
+    }
+  })
+}
+const handleDelete = async (row) => {
+  const delIds = row?.id || ids.value.join(',')
+  try {
+    await ElMessageBox.confirm('确认删除？')
+    const res = await delService(delIds)
+    if (res.code === 200) {
+      ElMessage.success('删除成功')
+      getList()
+    }
+  } catch (e) {
+    if (e !== 'cancel') console.error('删除失败', e)
+  }
+}
 
-onMounted(() => { getList(); renderTypeChart(); renderTrendChart(); window.addEventListener('resize', () => { typeChart?.resize(); trendChart?.resize() }) })
+import { getServiceTypeDistribution, getServiceTrend } from '@/api/system/service'
+
+const typeChartRef = ref(null)
+const trendChartRef = ref(null)
+
+let typeChart = null
+let trendChart = null
+
+
+const renderChart1 = async () => {
+  if (!typeChartRef.value) return
+  try {
+    const res = await getServiceTypeDistribution()
+    const data = res.code === 200 ? (res.data || []) : []
+    if (typeChart) typeChart.dispose()
+    typeChart = echarts.init(typeChartRef.value)
+    const sorted = [...data].sort((a,b) => b.value - a.value)
+    typeChart.setOption({
+      tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
+      grid: { left: 80, right: 40, top: 20, bottom: 30 },
+      xAxis: { type: 'value', name: '服务量' },
+      yAxis: { type: 'category', data: sorted.map(d => d.name).reverse(), axisLabel: { fontSize: 11 } },
+      series: [{
+        type: 'bar',
+        data: sorted.map(d => d.value).reverse(),
+        barWidth: 14,
+        itemStyle: { borderRadius: [0, 4, 4, 0], color: new echarts.graphic.LinearGradient(0, 0, 1, 0, [{ offset: 0, color: '#409EFF' }, { offset: 1, color: '#79BBFF' }]) }
+      }]
+    })
+  } catch (e) { console.error('加载服务类型分布失败', e) }
+}
+
+const renderChart2 = async () => {
+  if (!trendChartRef.value) return
+  try {
+    const res = await getServiceTrend()
+    const data = res.code === 200 ? (res.data || []) : []
+    if (trendChart) trendChart.dispose()
+    trendChart = echarts.init(trendChartRef.value)
+    trendChart.setOption({
+      tooltip: { trigger: 'axis' },
+      xAxis: { type: 'category', data: data.map(d => d.year || d.name) || [], name: '年份' },
+      yAxis: { type: 'value', name: '服务量' },
+      series: [{ type: 'line', data: data.map(d => d.value) || [], smooth: true, lineStyle: { color: '#67C23A', width: 3 }, areaStyle: { opacity: 0.3 } }]
+    })
+  } catch (e) { console.error('加载服务趋势失败', e) }
+}
+
+onMounted(async () => {
+  await loadSummary()
+  await Promise.all([renderChart1(), renderChart2()])
+  getList()
+  window.addEventListener('resize', () => { typeChart?.resize(); trendChart?.resize() })
+})
 onBeforeUnmount(() => { typeChart?.dispose(); trendChart?.dispose() })
 </script>
 
@@ -80,3 +200,6 @@ onBeforeUnmount(() => { typeChart?.dispose(); trendChart?.dispose() })
 .chart-row { margin-bottom: 20px; }
 .mb8 { margin-bottom: 8px; }
 </style>
+
+
+

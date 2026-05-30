@@ -1,11 +1,11 @@
-import axios from 'axios'
-import { Message, MessageBox } from 'element-ui'
+﻿import axios from 'axios'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import store from '@/store'
 import { getToken } from '@/utils/auth'
 
 // 创建 axios 实例
 const service = axios.create({
-    baseURL: process.env.VUE_APP_BASE_API || '/api',
+    baseURL: '/dev-api',
     timeout: 30000,
     headers: {
         'Content-Type': 'application/json;charset=utf-8'
@@ -35,7 +35,7 @@ service.interceptors.response.use(
 
         // 如果返回的是文件流，直接返回
         if (response.config.responseType === 'blob') {
-            return response
+            return response.data
         }
 
         // 根据后端返回的 code 判断
@@ -46,7 +46,7 @@ service.interceptors.response.use(
         // 其他错误码处理
         if (res.code === 401) {
             // 未授权，清除 token 并跳转到登录页
-            MessageBox.confirm('登录状态已过期，请重新登录', '系统提示', {
+            ElMessageBox.confirm('登录状态已过期，请重新登录', '系统提示', {
                 confirmButtonText: '重新登录',
                 cancelButtonText: '取消',
                 type: 'warning'
@@ -57,10 +57,10 @@ service.interceptors.response.use(
             })
             return Promise.reject(new Error('未授权'))
         } else if (res.code === 500) {
-            Message.error(res.msg || '服务器错误')
+            ElMessage.error(res.msg || '服务器错误')
             return Promise.reject(new Error(res.msg || '服务器错误'))
         } else {
-            Message.error(res.msg || '请求失败')
+            ElMessage.error(res.msg || '请求失败')
             return Promise.reject(new Error(res.msg || '请求失败'))
         }
     },
@@ -70,31 +70,32 @@ service.interceptors.response.use(
         if (response) {
             switch (response.status) {
                 case 400:
-                    Message.error('请求参数错误')
+                    ElMessage.error('请求参数错误')
                     break
                 case 401:
-                    Message.error('未授权，请重新登录')
+                    ElMessage.error('未授权，请重新登录')
                     store.dispatch('LogOut').then(() => {
                         location.href = '/login'
                     })
                     break
                 case 403:
-                    Message.error('拒绝访问')
+                    ElMessage.error('拒绝访问')
                     break
                 case 404:
-                    Message.error('请求资源不存在')
+                    ElMessage.error('请求资源不存在')
                     break
                 case 500:
-                    Message.error('服务器内部错误')
+                    ElMessage.error('服务器内部错误')
                     break
                 default:
-                    Message.error(response.data?.msg || '网络错误')
+                    ElMessage.error(response.data?.msg || '网络错误')
             }
         } else {
-            Message.error('网络连接异常，请检查网络')
+            ElMessage.error('网络连接异常，请检查网络')
         }
         return Promise.reject(error)
     }
 )
 
 export default service
+
