@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="page-container">
     <div class="ai-header">
       <h2><el-icon><Cpu /></el-icon> 智能分析中心</h2>
@@ -138,7 +138,7 @@
 import { ref, nextTick, onMounted, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { Cpu, ChatDotRound, User, Microphone, Close, Headset, Picture, UploadFilled, Warning, FolderOpened, Document, Plus, Delete } from '@element-plus/icons-vue'
-import { sendChatMessage, speechToText, textToSpeech, getSessionList, createSession, deleteSession, getChatHistory } from '@/api/ai'
+import { sendChatMessage, sendChatMessageStream, speechToText, textToSpeech, getSessionList, createSession, deleteSession, getChatHistory } from '@/api/ai'
 
 const activeTab = ref('chat')
 const chatMessages = ref([{ role: 'assistant', content: '你好！我是数据分析助手，可以帮你查询床位、费用、服务量等数据。', time: new Date().toLocaleTimeString() }])
@@ -172,18 +172,53 @@ const scrollToBottom = async () => {
 watch(chatMessages, () => { scrollToBottom() }, { deep: true })
 
 const sendChat = async () => {
-  if (!currentSessionId.value) { await handleNewSession(); if (!currentSessionId.value) return }
+  if (!currentSessionId.value) {
+    try {
+      const res = await createSession(userId.value)
+      if (res.code === 200) {
+        currentSessionId.value = res.msg
+        await loadSessions()
+      }
+    } catch (e) { console.error('create session failed', e); return }
+  }
   if (!chatInput.value.trim()) return
   chatMessages.value.push({ role: 'user', content: chatInput.value, time: new Date().toLocaleTimeString() })
   const q = chatInput.value; chatInput.value = ''; chatLoading.value = true
-  try {
-    const res = await sendChatMessage(currentSessionId.value, q)
-    if (res.code === 200) chatMessages.value.push({ role: 'assistant', content: res.msg, time: new Date().toLocaleTimeString() })
-    else chatMessages.value.push({ role: 'assistant', content: '抱歉，AI 服务暂时不可用。', time: new Date().toLocaleTimeString() })
-  } catch (e) {
-    chatMessages.value.push({ role: 'assistant', content: 'AI 服务连接失败，请稍后重试。', time: new Date().toLocaleTimeString() })
-  }
-  chatLoading.value = false
+
+  // 用固定索引跟踪消息，splice 替换强制触发 Vue 更新
+  const msgIndex = chatMessages.value.length
+  chatMessages.value.push({ role: 'assistant', content: '', time: new Date().toLocaleTimeString() })
+
+  const streamStartTime = Date.now()
+  sendChatMessageStream(currentSessionId.value, q,
+    (chunk) => {
+      const msg = chatMessages.value[msgIndex]
+      if (msg) {
+        msg.content += chunk
+        chatMessages.value.splice(msgIndex, 1, { ...msg })
+      }
+    },
+    () => {
+      const elapsed = Date.now() - streamStartTime
+      console.log('[Chat] 流式对话完成，耗时:', elapsed, 'ms')
+      chatLoading.value = false
+      const msg = chatMessages.value[msgIndex]
+      if (msg) {
+        if (!msg.content) {
+          msg.content = '抱歉，AI 返回为空。'
+        }
+        chatMessages.value.splice(msgIndex, 1, { ...msg })
+      }
+    },
+    (err) => {
+      chatLoading.value = false
+      const msg = chatMessages.value[msgIndex]
+      if (msg) {
+        msg.content = 'AI 服务连接失败：' + err
+        chatMessages.value.splice(msgIndex, 1, { ...msg })
+      }
+    }
+  )
 }
 
 const clearChat = () => { chatMessages.value = [{ role: 'assistant', content: '你好！我是数据分析助手，有什么可以帮你？', time: new Date().toLocaleTimeString() }] }
@@ -195,7 +230,15 @@ const loadSessions = async () => {
 const handleNewSession = async () => {
   try {
     const res = await createSession(userId.value)
-    if (res.code === 200) { currentSessionId.value = res.data; chatMessages.value = [{ role: 'assistant', content: '你好！我是数据分析助手，有什么可以帮你？', time: new Date().toLocaleTimeString() }]; await loadSessions() }
+    if (res.code === 200) {
+      currentSessionId.value = res.msg
+      // 重置聊天区域
+      chatMessages.value = [{ role: 'assistant', content: '你好！我是数据分析助手，有什么可以帮你？', time: new Date().toLocaleTimeString() }]
+      // 重新加载会话列表并选中新会话
+      await loadSessions()
+      // 滚动到底部
+      scrollToBottom()
+    }
   } catch (e) { console.error('创建会话失败', e) }
 }
 
@@ -213,8 +256,20 @@ const switchSession = async (sessionId) => {
 const handleDeleteSession = async (sessionId) => {
   try {
     await deleteSession(sessionId)
-    if (currentSessionId.value === sessionId) { currentSessionId.value = ''; chatMessages.value = [{ role: 'assistant', content: '你好！我是数据分析助手，有什么可以帮你？', time: new Date().toLocaleTimeString() }] }
-    await loadSessions()
+    if (currentSessionId.value === sessionId) {
+      currentSessionId.value = ''
+      // 重新加载会话列表
+      await loadSessions()
+      // 如果有其他会话，自动选择最后一个
+      if (sessionList.value.length > 0) {
+        await switchSession(sessionList.value[sessionList.value.length - 1].id)
+      } else {
+        // 没有会话了，重置聊天区域
+        chatMessages.value = [{ role: 'assistant', content: '你好！我是数据分析助手，有什么可以帮你？', time: new Date().toLocaleTimeString() }]
+      }
+    } else {
+      await loadSessions()
+    }
   } catch (e) { console.error('删除会话失败', e) }
 }
 
@@ -224,7 +279,12 @@ const asrSpeaking = ref(false)
 const processAsrResult = async (text) => {
   if (!text || text === '暂无识别结果') { asrQueryLoading.value = false; return }
   asrResult.value = text
-  if (!currentSessionId.value) { await handleNewSession(); if (!currentSessionId.value) { asrQueryLoading.value = false; return } }
+  if (!currentSessionId.value) {
+    try {
+      const cres = await createSession(userId.value)
+      if (cres.code === 200) { currentSessionId.value = cres.msg; await loadSessions() }
+    } catch (e) { console.error('create session failed', e); asrQueryLoading.value = false; return }
+  }
   try {
     const res = await sendChatMessage(currentSessionId.value, text)
     if (res.code === 200) { asrQueryResult.value = res.msg }
@@ -319,8 +379,7 @@ const viewDetail = (row) => { ElMessage.info('异常检测功能待后续更新'
 
 onMounted(async () => {
   await loadSessions()
-  if (sessionList.value.length > 0) await switchSession(sessionList.value[0].id)
-  else await handleNewSession()
+  if (sessionList.value.length > 0) await switchSession(sessionList.value[sessionList.value.length - 1].id)
   generateReportContent()
 })
 </script>
@@ -394,3 +453,10 @@ onMounted(async () => {
 .detection-stats .stat-value { font-size: 32px; font-weight: bold; }
 .detection-stats .stat-label { font-size: 14px; opacity: 0.85; margin-top: 4px; }
 </style>
+
+
+
+
+
+
+

@@ -1,8 +1,8 @@
 package com.ruoyi.web.controller;
 
 import com.ruoyi.common.core.controller.BaseController;
-import com.ruoyi.system.domain.ChatMessage;
 import com.ruoyi.common.core.domain.AjaxResult;
+import com.ruoyi.system.domain.ChatMessage;
 import com.ruoyi.system.service.AsrService;
 import com.ruoyi.system.service.ChatService;
 import com.ruoyi.system.service.ChatSessionService;
@@ -14,8 +14,13 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import com.ruoyi.common.annotation.Anonymous;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
+
 import java.util.Map;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 /**
  * 算法模块 — 智能分析助手
@@ -27,6 +32,7 @@ import java.util.Map;
 public class AlgorithmController extends BaseController
 {
     private static final Logger log = LoggerFactory.getLogger(AlgorithmController.class);
+    private static final ExecutorService sseExecutor = Executors.newCachedThreadPool();
 
     private final AsrService asrService;
     private final ChatService chatService;
@@ -42,10 +48,65 @@ public class AlgorithmController extends BaseController
     }
 
     /**
-     * 智能对话 — 纯大模型对话
+     * 智能对话 — 流式输出
+     * GET /algorithm/chat/stream?sessionId=xxx&question=xxx
+     * 返回 SSE (text/event-stream)
+     */
+    @Anonymous
+    @GetMapping("/chat/stream")
+    public SseEmitter chatStream(
+            @RequestParam("sessionId") String sessionId,
+            @RequestParam("question") String question)
+    {
+        // 超时时间 5 分钟
+        SseEmitter emitter = new SseEmitter(300000L);
+
+        // 保存用户消息
+        if (sessionId != null && !sessionId.isEmpty()) {
+            chatSessionService.saveMessage(sessionId, "user", question.trim());
+        }
+
+        StringBuilder fullAnswer = new StringBuilder();
+
+        chatService.chatStream(question.trim(), null,
+            // onChunk: 每收到一块就推给前端
+            chunk -> {
+                try {
+                    emitter.send(SseEmitter.event().name("message").data(chunk));
+                    fullAnswer.append(chunk);
+                } catch (Exception e) {
+                    log.error("发送 SSE chunk 失败", e);
+                }
+            },
+            // onDone: 流结束，保存消息
+            () -> {
+                try {
+                    emitter.send(SseEmitter.event().name("done").data("[DONE]"));
+                    if (sessionId != null && !sessionId.isEmpty() && fullAnswer.length() > 0) {
+                        chatSessionService.saveMessage(sessionId, "assistant", fullAnswer.toString());
+                    }
+                } catch (Exception e) {
+                    log.error("发送 SSE done 事件失败", e);
+                }
+                emitter.complete();
+            },
+            // onError: 出错
+            error -> {
+                try {
+                    emitter.send(SseEmitter.event().name("error").data(error));
+                } catch (Exception e) {
+                    log.error("发送 SSE error 事件失败", e);
+                }
+                emitter.completeWithError(new RuntimeException(error));
+            }
+        );
+
+        return emitter;
+    }
+
+    /**
+     * 智能对话 — 非流式（保留，用于语音 pipeline 等场景）
      * POST /algorithm/chat
-     * Body: { "question": "..." }
-     * 返回: { "msg": "回答内容", "code": 200 }
      */
     @PostMapping("/chat")
     public AjaxResult chat(@RequestBody Map<String, Object> body)
@@ -80,18 +141,11 @@ public class AlgorithmController extends BaseController
         return success(answer);
     }
 
-    /**
-     * 语音识别 — 纯 ASR
-     * POST /algorithm/asr
-     * 接收音频文件，返回识别文本
-     * 返回: { "msg": "识别文本", "code": 200 }
-     */
-
     @PostMapping("/chat/sessions")
     public AjaxResult getSessions(@RequestBody Map<String, Object> body)
     {
         Long userId = body != null ? Long.valueOf(body.get("userId").toString()) : null;
-        if (userId == null) return error("\u7528\u6237ID\u4e0d\u80fd\u4e3a\u7a7a");
+        if (userId == null) return error("用户ID不能为空");
         return success(chatSessionService.getSessionList(userId));
     }
 
@@ -99,7 +153,7 @@ public class AlgorithmController extends BaseController
     public AjaxResult createSession(@RequestBody Map<String, Object> body)
     {
         Long userId = body != null ? Long.valueOf(body.get("userId").toString()) : null;
-        if (userId == null) return error("\u7528\u6237ID\u4e0d\u80fd\u4e3a\u7a7a");
+        if (userId == null) return error("用户ID不能为空");
         String sessionId = chatSessionService.createSession(userId);
         return success(sessionId);
     }
@@ -108,7 +162,7 @@ public class AlgorithmController extends BaseController
     public AjaxResult deleteSession(@RequestBody Map<String, Object> body)
     {
         String sessionId = body != null ? (String) body.get("sessionId") : null;
-        if (sessionId == null) return error("\u4f1a\u8bddID\u4e0d\u80fd\u4e3a\u7a7a");
+        if (sessionId == null) return error("会话ID不能为空");
         chatSessionService.deleteSession(sessionId);
         return success();
     }
@@ -117,7 +171,7 @@ public class AlgorithmController extends BaseController
     public AjaxResult getHistory(@RequestBody Map<String, Object> body)
     {
         String sessionId = body != null ? (String) body.get("sessionId") : null;
-        if (sessionId == null) return error("\u4f1a\u8bddID\u4e0d\u80fd\u4e3a\u7a7a");
+        if (sessionId == null) return error("会话ID不能为空");
         return success(chatSessionService.getHistory(sessionId));
     }
 
@@ -140,12 +194,6 @@ public class AlgorithmController extends BaseController
         }
     }
 
-    /**
-     * 语音合成 — 纯 TTS
-     * POST /algorithm/tts
-     * Body: { "text": "..." }
-     * 返回音频文件流（wav 格式）
-     */
     @PostMapping("/tts")
     public ResponseEntity<byte[]> tts(@RequestBody Map<String, String> body)
     {
@@ -173,12 +221,6 @@ public class AlgorithmController extends BaseController
         }
     }
 
-    /**
-     * 全链路：语音 → 对话 → 语音
-     * POST /algorithm/pipeline
-     * 接收音频文件，经过 ASR → DeepSeek → TTS，返回合成的音频
-     * 返回音频文件流（wav 格式）
-     */
     @PostMapping("/pipeline")
     public ResponseEntity<byte[]> pipeline(@RequestParam("file") MultipartFile file)
     {
@@ -188,25 +230,20 @@ public class AlgorithmController extends BaseController
         }
         try
         {
-            // Step 1: ASR 语音识别
             log.info("Pipeline Step 1: ASR 语音识别开始");
             String recognizedText = asrService.recognize(file);
             log.info("Pipeline Step 1: ASR 完成，识别文本: {}", recognizedText);
 
-            // 构造一个完整的查询上下文
             String question = "请根据以下内容进行分析和回答：\n" + recognizedText;
 
-            // Step 2: DeepSeek 对话
             log.info("Pipeline Step 2: 大模型对话开始");
             String answer = chatService.chat(question, null);
             log.info("Pipeline Step 2: 大模型回答完成，长度: {}", answer.length());
 
-            // Step 3: TTS 语音合成
             log.info("Pipeline Step 3: TTS 语音合成开始");
             byte[] audioData = ttsService.synthesize(answer);
             log.info("Pipeline Step 3: TTS 合成完成，大小: {} bytes", audioData.length);
 
-            // 在响应头中附加识别文本和回答，方便前端展示
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.parseMediaType("audio/wav"));
             headers.setContentLength(audioData.length);
@@ -223,7 +260,6 @@ public class AlgorithmController extends BaseController
         }
     }
 
-    // 保留原有的图像分类和目标检测接口（占位）
     @PostMapping("/image-classify")
     public AjaxResult imageClassify(@RequestParam("file") MultipartFile file)
     {

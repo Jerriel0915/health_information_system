@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <div class="page-container">
     <el-row :gutter="16" class="stat-cards">
       <el-col :span="6" v-for="item in stats" :key="item.title">
@@ -19,7 +19,7 @@
     <el-row :gutter="10" class="mb8"><el-col :span="1.5"><el-button type="primary" plain @click="handleAdd">新增</el-button></el-col><el-col :span="1.5"><el-button type="success" plain :disabled="single" @click="handleUpdate">修改</el-button></el-col><el-col :span="1.5"><el-button type="danger" plain :disabled="multiple" @click="handleDelete">删除</el-button></el-col></el-row>
 
     <el-table v-loading="loading" :data="list" @selection-change="handleSelectionChange">
-      <el-table-column type="selection" width="55" /><el-table-column label="序号" prop="id" width="80" /><el-table-column label="区域编码" prop="regionCode" /><el-table-column label="区域名称" prop="regionName" /><el-table-column label="区域级别" prop="regionLevel"><template #default="{ row }"><el-tag :type="row.regionLevel === '1' ? 'danger' : row.regionLevel === '2' ? 'warning' : 'success'">{{ row.regionLevel === '1' ? '省级' : row.regionLevel === '2' ? '市级' : '区县级' }}</el-tag></template></el-table-column><el-table-column label="父级ID" prop="parentId" /><el-table-column label="操作" width="150"><template #default="{ row }"><el-button link type="primary" size="small" @click="handleUpdate(row)">编辑</el-button><el-button link type="danger" size="small" @click="handleDelete(row)">删除</el-button></template></el-table-column>
+      <el-table-column type="selection" width="55" /><el-table-column label="序号" prop="id" width="80" /><el-table-column label="区域编码" prop="regionCode" /><el-table-column label="区域名称" prop="regionName" /><el-table-column label="区域级别" prop="regionLevel"><template #default="{ row }"><el-tag :type="Number(row.regionLevel) === 1 ? 'danger' : Number(row.regionLevel) === 2 ? 'warning' : 'success'">{{ Number(row.regionLevel) === 1 ? '省级' : Number(row.regionLevel) === 2 ? '市级' : '区县级' }}</el-tag></template></el-table-column><el-table-column label="父级ID" prop="parentId" /><el-table-column label="操作" width="150"><template #default="{ row }"><el-button link type="primary" size="small" @click="handleUpdate(row)">编辑</el-button><el-button link type="danger" size="small" @click="handleDelete(row)">删除</el-button></template></el-table-column>
     </el-table>
     <pagination v-show="total>0" v-model:page="queryParams.pageNum" v-model:limit="queryParams.pageSize" :total="total" @pagination="getList" />
 
@@ -106,6 +106,7 @@ const submitForm = async () => {
         const res = form.value.id ? await updateRegion(form.value) : await addRegion(form.value)
         if (res.code === 200) {
           ElMessage.success('操作成功')
+          await renderChart1(), renderChart2()
           dialogVisible.value = false
           getList()
         }

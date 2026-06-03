@@ -1,7 +1,13 @@
 ﻿# 健康大数据统计分析决策系统
 
 > 健康大数据应用创新研发中心项目
-> 技术栈：SpringBoot 3 + MyBatis-Plus + Vue 3 + Element Plus + ECharts
+> 技术栈：Spring Boot 4.0.3 + MyBatis + Druid + Redis + MySQL + Vue 3 + Element Plus + ECharts
+
+---
+
+## 项目概述
+
+健康大数据应用创新研发中心统计分析决策系统，是一个面向医疗健康领域的多维度数据分析与智能决策平台。系统集成了人口信息、医疗卫生机构、医务人员、床位资源、医疗服务、医疗费用六大核心模块的统计分析与可视化展示，同时引入大模型对话、语音识别、语音合成等AI技术，为研发人员和管理人员提供数据查询、统计解读和决策建议服务。
 
 ---
 
@@ -9,22 +15,59 @@
 
 ```
 health_system/
-├── server/          # 后端（SpringBoot 3 + RuoYi）
-│   ├── ruoyi-admin/     # 启动入口，Controller 层
-│   ├── ruoyi-system/    # 业务逻辑层（Service / Mapper / Entity）
-│   ├── ruoyi-framework/ # 框架配置（安全、CORS、拦截器）
-│   ├── ruoyi-common/    # 公共工具类（含 AlgorithmConfig）
-│   ├── ruoyi-quartz/    # 定时任务（RuoYi 自带，未使用）
-│   └── ruoyi-generator/ # 代码生成器（RuoYi 自带，未使用）
+├── server/                   # 后端（Spring Boot + RuoYi）
+│   ├── ruoyi-admin/          # 启动入口、Controller
+│   ├── ruoyi-system/         # 业务逻辑（Service / Mapper / Entity）
+│   ├── ruoyi-framework/      # 框架配置（安全、CORS、拦截器）
+│   ├── ruoyi-common/         # 公共工具类（含算法配置）
+│   ├── ruoyi-quartz/         # 定时任务（RuoYi自带，未使用）
+│   ├── ruoyi-generator/      # 代码生成器（RuoYi自带，未使用）
+│   └── sql/                  # 数据库初始化脚本
 │
-├── web/             # 前端（Vue 3 + Element Plus + Vite）
+├── web/                      # 前端（Vue 3 + Element Plus + Vite）
 │
-└── 后端接口对接文档.md  # 38 个 API 的完整接口说明
+└── 后端接口对接文档.md         # API 接口说明文档
 ```
 
 ---
 
-## 后端启动
+## 环境要求
+
+| 环境 | 版本 | 说明 |
+|------|------|------|
+| JDK | 17+ | 后端运行环境 |
+| Maven | 3.8+ | 后端构建工具 |
+| MySQL | 8.0+ | 数据库 |
+| Redis | 任意 | 缓存（非强制） |
+| Node.js | 18+ | 前端运行环境 |
+
+---
+
+## 快速启动
+
+### 1. 数据库初始化
+
+```bash
+# 创建数据库
+mysql -u root -p -e "CREATE DATABASE health_data_manager CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
+
+# 导入表结构和数据
+mysql -u root -p health_data_manager < server/sql/health_data_manager.sql
+```
+
+### 2. 配置 API Key（可选）
+
+AI 功能需要配置 API Key，通过系统环境变量设置：
+
+```bash
+# Windows PowerShell
+$env:DEEPSEEK_API_KEY="你的DeepSeek Key"
+$env:DASHSCOPE_API_KEY="你的阿里云DashScope Key"
+```
+
+不配置不影响后端启动和业务功能，仅 AI 对话/语音不可用。
+
+### 3. 启动后端
 
 ```bash
 cd server
@@ -32,66 +75,45 @@ mvn clean package -DskipTests
 java -jar ruoyi-admin/target/ruoyi-admin.jar
 ```
 
-或使用 Maven 直接运行：
+后端运行在 http://localhost:8081
+
+### 4. 启动前端
 
 ```bash
-cd server
-mvn spring-boot:run -pl ruoyi-admin
+cd web
+npm install
+npm run dev
 ```
 
-> 建议在启动前设置 DashScope API Key 环境变量：
-> ```bash
-> set DASHSCOPE_API_KEY=你的key
-> ```
+前端运行在 http://localhost:5173
 
 ---
 
-## 接口说明
+## 功能模块
 
-### 基础信息
+### 统计分析（7 大模块，38 个接口）
+- 首页看板：系统概览、趋势图、分布图
+- 人口信息：人口结构、年龄/性别/区域分布
+- 区域维度：区域树形结构及总览
+- 医疗机构：机构类型/等级/区域分布
+- 医务人员：职称/类别/学历/性别分布
+- 医疗床位：科室/区域分布、使用率分析
+- 医疗服务：类型/科室分布、疾病排行
+- 医疗费用：费用构成、医保分析、次均费用
 
-| 项目 | 说明 |
-|------|------|
-| 服务地址 | http://localhost:8081 |
-| 登录接口 | POST /login |
-| 默认账号 | admin / admin123 |
-| 验证码 | 已关闭（code、uuid 传空字符串） |
-| 认证方式 | Bearer Token |
-
-### 统计分析接口（38 个）
-
-| 模块 | 接口数量 | 说明 |
-|------|----------|------|
-| 首页看板 | 1 | 全系统总览数据 |
-| 医疗机构 | 7 | CRUD + 类型/等级/区域分布 + 趋势 |
-| 医疗人员 | 8 | CRUD + 职称/类别/学历/性别分布 + 趋势 |
-| 医疗床位 | 7 | CRUD + 科室/区域分布 + 使用率 + 趋势 |
-| 医疗服务 | 8 | CRUD + 类型/科室分布 + 疾病排行 + 趋势 |
-| 医疗费用 | 8 | CRUD + 构成/医保/次均费用分析 + 趋势 |
-| 人口维度 | 7 | CRUD + 年龄/性别/区域分布 + 趋势 |
-| 区域维度 | 5 | CRUD + 树形 + 总览 |
-
-完整接口文档见 [后端接口对接文档.md](./后端接口对接文档.md)
-
-### 算法模块接口（5 个）
-
-| 方法 | 路径 | 说明 |
-|------|------|------|
-| POST | /algorithm/chat | 智能对话（DeepSeek） |
-| POST | /algorithm/asr | 语音识别（阿里云 Paraformer-realtime-v2） |
-| POST | /algorithm/tts | 语音合成（阿里云 Sambert） |
-| POST | /algorithm/pipeline | 语音→对话→语音全链路 |
-| POST | /algorithm/image-classify | 图像分类（预留） |
-| POST | /algorithm/object-detect | 目标检测（预留） |
+### AI 智能分析
+- 智能对话：基于 DeepSeek 大模型，AI 角色"小慧"
+- 语音识别：阿里云 DashScope Paraformer 模型
+- 语音合成：阿里云 DashScope Sambert 模型
+- 语音查询全链路：ASR → DeepSeek → TTS
 
 ---
 
-## 数据库
+## 登录信息
 
-- 数据库名：`health_data_manager`
-- 端口：3306
-- 编码：utf8mb4
-- Redis：不强制依赖
+- 默认账号：admin / admin123
+- 验证码：已关闭（便于联调测试）
+- 认证方式：Bearer Token
 
 ---
 
@@ -99,6 +121,7 @@ mvn spring-boot:run -pl ruoyi-admin
 
 | 分支 | 说明 |
 |------|------|
-| feature/backend | 后端开发主分支（当前） |
-| feat/statistics-module | 前端统计分析页面代码（已归档） |
-| main | 主线分支 |
+| main | 稳定分支 |
+| feature-backend | 后端开发分支 |
+| feature | 前端开发分支 |
+| release/v1.0-full-integration | 全量集成版本 |

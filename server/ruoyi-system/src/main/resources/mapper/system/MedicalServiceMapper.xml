@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="UTF-8" ?>
+﻿<?xml version="1.0" encoding="UTF-8" ?>
 <!DOCTYPE mapper
 PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
@@ -10,6 +10,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="orgId"    column="org_id"    />
         <result property="patientName"    column="patient_name"    />
         <result property="patientGender"    column="patient_gender"    />
+        <result property="orgName"    column="org_name"    />
         <result property="patientAge"    column="patient_age"    />
         <result property="serviceType"    column="service_type"    />
         <result property="department"    column="department"    />
@@ -25,7 +26,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     </resultMap>
 
     <sql id="selectMedicalServiceVo">
-        select id, service_code, org_id, patient_name, patient_gender, patient_age, service_type, department, diagnosis_code, diagnosis_name, doctor_id, service_date, discharge_date, days_in_hospital, service_status, created_at, updated_at from medical_service
+        select s.id, s.service_code, s.org_id, i.org_name, s.patient_name, s.patient_gender, s.patient_age, s.service_type, s.department, s.diagnosis_code, s.diagnosis_name, s.doctor_id, s.service_date, s.discharge_date, s.days_in_hospital, s.service_status, s.created_at, s.updated_at from medical_service s left join medical_institution i on s.org_id = i.id
     </sql>
 
     <select id="selectMedicalServiceList" parameterType="MedicalService" resultMap="MedicalServiceResult">
@@ -136,8 +137,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         select
             count(*) as totalServices,
             count(distinct service_type) as typeCount,
-            sum(case when service_type = '门诊' then 1 else 0 end) as outpatientCount,
-            sum(case when service_type = '住院' then 1 else 0 end) as inpatientCount,
+            sum(case when patient_name = '门诊' then 1 else 0 end) as outpatientCount,
+            sum(case when patient_name = '住院' then 1 else 0 end) as inpatientCount,
             round(avg(days_in_hospital), 1) as avgDaysInHospital
         from medical_service
         <where>
@@ -200,3 +201,4 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     </select>
 
 </mapper>
+
