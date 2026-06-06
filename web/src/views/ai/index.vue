@@ -5,33 +5,81 @@
       <p class="subtitle">集成对话大模型、语音交互、图像识别、异常检测等AI能力</p>
     </div>
     <el-tabs v-model="activeTab" type="border-card">
-      <el-tab-pane name="chat">
-        <template #label><span><el-icon><ChatDotRound /></el-icon> 数据分析助手</span></template>
-        <div class="chat-layout">
-          <div class="chat-sidebar">
-            <div class="sidebar-header"><span>会话列表</span><el-button type="primary" size="small" @click="handleNewSession" circle><el-icon><Plus /></el-icon></el-button></div>
-            <div class="session-list" v-if="sessionList.length">
-              <div v-for="s in sessionList" :key="s.id" :class="['session-item', { active: s.id === currentSessionId }]" @click="switchSession(s.id)">
-                <div class="session-title">{{ s.title }}</div>
-                <div class="session-time">{{ s.updatedAt ? new Date(s.updatedAt).toLocaleString() : '' }}</div>
-                <el-button link type="danger" size="small" class="session-del" @click.stop="handleDeleteSession(s.id)"><el-icon><Delete /></el-icon></el-button>
+      <el-tab-pane name="pneumonia">
+        <template #label>
+          <span><el-icon><Picture /></el-icon> 肺炎分类</span>
+        </template>
+        <div class="pneumonia-container">
+          <el-card class="pneumonia-card">
+            <template #header>
+              <div class="card-header">
+                <span>🫁 肺炎X光图像分类</span>
+                <el-tag type="info" size="small">AI 智能分析</el-tag>
+              </div>
+            </template>
+
+            <!-- 上传区域 -->
+            <el-upload
+                class="pneumonia-upload"
+                drag
+                action="#"
+                :before-upload="handlePneumoniaUpload"
+                accept="image/jpeg,image/png"
+                :show-file-list="false"
+            >
+              <el-icon class="el-icon--upload"><UploadFilled /></el-icon>
+              <div class="el-upload__text">
+                拖拽X光图片到此处 或 <em>点击上传</em>
+              </div>
+              <template #tip>
+                <div class="el-upload__tip">
+                  支持 jpg / png 格式，单张图片不超过 10MB
+                </div>
+              </template>
+            </el-upload>
+
+            <!-- 图片预览 -->
+            <div v-if="pneumoniaPreviewUrl" class="pneumonia-preview">
+              <div class="preview-title">当前X光片：</div>
+              <div class="preview-img">
+                <el-image :src="pneumoniaPreviewUrl" fit="contain" :preview-src-list="[pneumoniaPreviewUrl]" />
               </div>
             </div>
-            <div v-else class="sidebar-empty">暂无会话</div>
-          </div>
-          <div class="chat-main">
-            <div class="chat-messages" ref="chatMessagesRef">
-              <div v-for="(msg, idx) in chatMessages" :key="idx" :class="['message', msg.role]">
-                <div class="message-avatar"><el-icon><User v-if="msg.role === 'user'" /><Cpu v-else /></el-icon></div>
-                <div class="message-content"><div class="message-text">{{ msg.content }}</div><div class="message-time">{{ msg.time }}</div></div>
+
+            <!-- 分析结果 -->
+            <div v-if="pneumoniaResult" class="pneumonia-result">
+              <el-divider />
+              <div class="result-header">
+                <span>📊 分析结果</span>
               </div>
-              <div v-if="chatLoading" class="message assistant"><div class="message-avatar"><el-icon><Cpu /></el-icon></div><div class="message-content"><div class="typing-indicator"><span></span><span></span><span></span></div></div></div>
+              <div class="result-content">
+                <div class="result-item">
+                  <span class="label">诊断结果：</span>
+                  <el-tag :type="pneumoniaResult.result === '肺炎' ? 'danger' : 'success'" size="large">
+                    {{ pneumoniaResult.result === '肺炎' ? '肺炎阳性' : '肺炎阴性' }}
+                  </el-tag>
+                </div>
+                <div class="result-item">
+                  <span class="label">置信度：</span>
+                  <el-progress
+                      :percentage="Math.round(pneumoniaResult.confidence * 100)"
+                      :color="pneumoniaResult.result === '肺炎' ? '#f56c6c' : '#67c23a'"
+                      :format="() => (pneumoniaResult.confidence * 100).toFixed(2) + '%'"
+                  />
+                </div>
+                <div class="result-item" v-if="pneumoniaResult.class_id !== undefined">
+                  <span class="label">类别ID：</span>
+                  <span>{{ pneumoniaResult.class_id }}（{{ pneumoniaResult.class_id === 0 ? '正常' : '肺炎' }}）</span>
+                </div>
+              </div>
             </div>
-            <div class="chat-input-area">
-              <el-input v-model="chatInput" type="textarea" :rows="3" placeholder="输入问题，例如：今年床位使用率趋势如何？" @keyup.ctrl.enter="sendChat" />
-              <div class="chat-actions"><el-button type="primary" @click="sendChat" :loading="chatLoading">发送 (Ctrl+Enter)</el-button><el-button @click="clearChat">清空对话</el-button></div>
+
+            <!-- 加载中 -->
+            <div v-if="pneumoniaLoading" class="pneumonia-loading">
+              <el-icon class="is-loading"><Loading /></el-icon>
+              <span>AI 模型正在分析中，请稍后...</span>
             </div>
-          </div>
+          </el-card>
         </div>
       </el-tab-pane>
             <el-tab-pane name="asr">
@@ -130,16 +178,94 @@
           </el-table>
         </div>
       </el-tab-pane>
+      <el-tab-pane name="bone">
+        <template #label>
+          <span><el-icon><Picture /></el-icon> 肺炎分类</span>
+        </template>
+        <div class="bone-container">
+          <el-card class="bone-card">
+            <template #header>
+              <div class="card-header">
+                <span>🫁 肺炎X光图像分类</span>
+                <el-tag type="info" size="small">AI 智能分析</el-tag>
+              </div>
+            </template>
+
+            <!-- 上传区域 -->
+            <el-upload
+                class="bone-upload"
+                drag
+                action="#"
+                :before-upload="handleBoneUpload"
+                accept="image/jpeg,image/png"
+                :show-file-list="false"
+            >
+              <el-icon class="el-icon--upload"><UploadFilled /></el-icon>
+              <div class="el-upload__text">
+                拖拽图片到此处 或 <em>点击上传</em>
+              </div>
+              <template #tip>
+                <div class="el-upload__tip">
+                  支持 jpg / png 格式，单张图片不超过 10MB
+                </div>
+              </template>
+            </el-upload>
+
+            <!-- 图片预览 -->
+            <div v-if="bonePreviewUrl" class="bone-preview">
+              <div class="preview-title">当前图片：</div>
+              <div class="preview-img">
+                <el-image :src="bonePreviewUrl" fit="contain" :preview-src-list="[bonePreviewUrl]" />
+              </div>
+            </div>
+
+            <!-- 分析结果 -->
+            <div v-if="boneResult" class="bone-result">
+              <el-divider />
+              <div class="result-header">
+                <span>📊 分析结果</span>
+              </div>
+              <div class="result-content">
+                <div class="result-item">
+                  <span class="label">分类结果：</span>
+                  <el-tag :type="boneResult.result === '异常' ? 'danger' : 'success'" size="large">
+                    {{ boneResult.result }}
+                  </el-tag>
+                </div>
+                <div class="result-item">
+                  <span class="label">置信度：</span>
+                  <el-progress
+                      :percentage="Math.round(boneResult.confidence * 100)"
+                      :color="boneResult.result === '异常' ? '#f56c6c' : '#67c23a'"
+                      :format="() => (boneResult.confidence * 100).toFixed(2) + '%'"
+                  />
+                </div>
+                <div class="result-item" v-if="boneResult.class_id !== undefined">
+                  <span class="label">类别ID：</span>
+                  <span>{{ boneResult.class_id }}（{{ boneResult.class_id === 0 ? '正常' : '异常' }}）</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- 加载中 -->
+            <div v-if="boneLoading" class="bone-loading">
+              <el-icon class="is-loading"><Loading /></el-icon>
+              <span>AI 模型正在分析中，请稍后...</span>
+            </div>
+          </el-card>
+        </div>
+      </el-tab-pane>
     </el-tabs>
   </div>
 </template>
 
-<script setup>
-import { ref, nextTick, onMounted, watch } from 'vue'
-import { ElMessage } from 'element-plus'
-import { Cpu, ChatDotRound, User, Microphone, Close, Headset, Picture, UploadFilled, Warning, FolderOpened, Document, Plus, Delete } from '@element-plus/icons-vue'
-import { sendChatMessage, speechToText, textToSpeech, getSessionList, createSession, deleteSession, getChatHistory } from '@/api/ai'
-
+  <script setup>
+  import { ref, nextTick, onMounted, watch } from 'vue'
+  import { ElMessage } from 'element-plus'
+  import { Cpu, ChatDotRound, User, Microphone, Close, Headset, Picture, UploadFilled, Warning, FolderOpened, Document, Plus, Delete, Loading } from '@element-plus/icons-vue'
+  import { sendChatMessage, speechToText, textToSpeech, getSessionList, createSession, deleteSession, getChatHistory } from '@/api/ai'
+  import axios from 'axios'
+  import { getToken } from '@/utils/auth'
 const activeTab = ref('chat')
 const chatMessages = ref([{ role: 'assistant', content: '你好！我是数据分析助手，可以帮你查询床位、费用、服务量等数据。', time: new Date().toLocaleTimeString() }])
 const chatInput = ref('')
@@ -316,7 +442,43 @@ const handleImageUpload = (file) => { ElMessage.info('图像分类功能待后�
 const clearImage = () => { uploadedImage.value = null; imageResult.value = null }
 const runDetection = () => { ElMessage.info('异常检测功能待后续更新') }
 const viewDetail = (row) => { ElMessage.info('异常检测功能待后续更新') }
+  // 肺炎分类
+  const boneResult = ref(null)
+  const boneLoading = ref(false)
+  const bonePreviewUrl = ref(null)
 
+  // 处理上传（阻止自动上传，只做预览）
+  const handleBoneUpload = (file) => {
+    // 生成预览 URL
+    bonePreviewUrl.value = URL.createObjectURL(file)
+    // 调用上传分析
+    uploadBoneImage(file)
+    return false // 阻止自动上传
+  }
+
+  // 上传并分析
+  const uploadBoneImage = async (file) => {
+    boneLoading.value = true
+    boneResult.value = null
+
+    const formData = new FormData()
+    formData.append('image', file)
+
+    try {
+      const token = getToken()
+      const res = await axios.post('http://localhost:8081/ai/classify-bone', formData, {
+        headers: {
+          'Authorization': 'Bearer ' + token
+        }
+      })
+      boneResult.value = res.data
+    } catch (err) {
+      console.error('肺炎分类失败', err)
+      ElMessage.error('上传失败：' + (err.response?.data?.msg || err.message))
+    } finally {
+      boneLoading.value = false
+    }
+  }
 onMounted(async () => {
   await loadSessions()
   if (sessionList.value.length > 0) await switchSession(sessionList.value[0].id)
@@ -326,6 +488,98 @@ onMounted(async () => {
 </script>
 
 <style scoped>
+.bone-container {
+  padding: 20px;
+  background: #f5f7fa;
+  min-height: 500px;
+}
+
+.bone-card {
+  max-width: 700px;
+  margin: 0 auto;
+  border-radius: 12px;
+}
+
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.bone-upload {
+  margin: 20px 0;
+}
+
+.bone-preview {
+  margin: 20px 0;
+  text-align: center;
+}
+
+.preview-title {
+  font-size: 14px;
+  color: #606266;
+  margin-bottom: 10px;
+}
+
+.preview-img {
+  max-height: 300px;
+  overflow: hidden;
+  border-radius: 8px;
+  background: #f5f7fa;
+}
+
+.preview-img .el-image {
+  width: 100%;
+  max-height: 280px;
+}
+
+.bone-result {
+  margin-top: 20px;
+}
+
+.result-header {
+  font-size: 14px;
+  font-weight: 600;
+  color: #303133;
+  margin-bottom: 16px;
+}
+
+.result-content {
+  background: #f5f7fa;
+  border-radius: 8px;
+  padding: 16px;
+}
+
+.result-item {
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+}
+
+.result-item .label {
+  width: 80px;
+  font-weight: 500;
+  color: #606266;
+}
+
+.result-item .el-progress {
+  flex: 1;
+  max-width: 300px;
+}
+
+.bone-loading {
+  text-align: center;
+  padding: 40px;
+  color: #409eff;
+}
+
+.bone-loading .el-icon {
+  font-size: 32px;
+  margin-bottom: 10px;
+  display: block;
+}
 .page-container { padding: 20px; }
 .ai-header { margin-bottom: 24px; }
 .ai-header h2 { margin: 0 0 8px; }

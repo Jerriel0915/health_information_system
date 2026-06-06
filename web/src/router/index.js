@@ -116,6 +116,18 @@ const routes = [
                 meta: { title: '智能分析' }
             }
         ]
+    },
+    {
+        path: '/bone',
+        component: Layout,
+        children: [
+            {
+                path: '',
+                name: 'BoneTest',
+                component: () => import('@/views/bone/index.vue'),
+                meta: { title: '骨骼分类测试' }
+            }
+        ]
     }
 ]
 
@@ -141,4 +153,3 @@ router.beforeEach((to, from, next) => {
 })
 
 export default router
-
