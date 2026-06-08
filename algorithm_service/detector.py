@@ -20,7 +20,7 @@ CQ_PARTS = [
 CQ = chr(32).join(CQ_PARTS)
 
 SQ_PARTS = [
-    "SELECT s.service_id, s.patient_name, s.patient_id_card,",
+    "SELECT s.service_id, s.service_category, s.patient_id_card,",
     "s.org_id, mi.org_name, s.service_date, s.service_type",
     "FROM medical_service s",
     "LEFT JOIN medical_institution mi ON s.org_id = mi.org_id",
@@ -86,7 +86,7 @@ def detect_visit_anomalies(df):
                     break
             if cnt >= 3:
                 w = g.iloc[i:i+cnt]
-                nm = str(w["patient_name"].iloc[0])
+                nm = str(w["service_category"].iloc[0])
                 desc = chr(30149) + chr(32773) + nm + chr(55) + chr(22825) + chr(20869) + chr(23601) + chr(35786) + str(cnt) + chr(27425)
                 res.append({
                     "recordId": str(w["service_id"].iloc[0]),

@@ -4,13 +4,14 @@ import com.ruoyi.common.core.controller.BaseController;
 import com.ruoyi.common.core.domain.AjaxResult;
 import com.ruoyi.system.domain.ChatMessage;
 import com.ruoyi.system.service.AsrService;
-import com.ruoyi.system.service.ChatService;
+
 import com.ruoyi.system.service.ChatSessionService;
 import com.ruoyi.system.service.TtsService;
 import com.ruoyi.common.annotation.Anonymous;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.*;
+import org.springframework.http.server.ServerHttpResponse;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.multipart.MultipartFile;
@@ -196,7 +197,15 @@ public class AlgorithmController extends BaseController
             @RequestParam("sessionId") String sessionId,
             @RequestParam("question") String question)
     {
-        SseEmitter emitter = new SseEmitter(300000L);
+        SseEmitter emitter = new SseEmitter(300000L) {
+            @Override
+            protected void extendResponse(ServerHttpResponse outputMessage) {
+                super.extendResponse(outputMessage);
+                outputMessage.getHeaders().set("X-Accel-Buffering", "no");
+                outputMessage.getHeaders().set("Cache-Control", "no-cache, no-transform");
+                outputMessage.getHeaders().set("Connection", "keep-alive");
+            }
+        };
 
         if (sessionId != null && !sessionId.isEmpty()) {
             chatSessionService.saveMessage(sessionId, "user", question.trim());

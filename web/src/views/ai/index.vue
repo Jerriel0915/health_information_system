@@ -190,27 +190,64 @@ const sendChat = async () => {
   chatMessages.value.push({ role: 'assistant', content: '', time: new Date().toLocaleTimeString() })
 
   const streamStartTime = Date.now()
+  let streamBuffer = ''
+  let typeTimer = null
+  let streamDone = false
+
+  const startTypewriter = () => {
+    if (typeTimer) return
+    typeTimer = setInterval(() => {
+      if (streamBuffer.length === 0) {
+        if (streamDone) {
+          clearInterval(typeTimer)
+          typeTimer = null
+          finishStream()
+        }
+        return
+      }
+      // 每次取1-3个字符
+      const take = Math.min(3, streamBuffer.length)
+      const chars = streamBuffer.slice(0, take)
+      streamBuffer = streamBuffer.slice(take)
+      const msg = chatMessages.value[msgIndex]
+      if (msg) {
+        msg.content += chars
+        chatMessages.value.splice(msgIndex, 1, { ...msg })
+      }
+    }, 30)
+  }
+
+  const finishStream = () => {
+    if (streamBuffer) {
+      const msg = chatMessages.value[msgIndex]
+      if (msg) {
+        msg.content += streamBuffer
+        streamBuffer = ''
+        chatMessages.value.splice(msgIndex, 1, { ...msg })
+      }
+    }
+    const elapsed = Date.now() - streamStartTime
+    console.log('[Chat] 流式对话完成，耗时:', elapsed, 'ms')
+    chatLoading.value = false
+    const msg = chatMessages.value[msgIndex]
+    if (msg && !msg.content) {
+      msg.content = '抱歉，AI 返回为空。'
+      chatMessages.value.splice(msgIndex, 1, { ...msg })
+    }
+  }
+
   sendChatMessageStream(currentSessionId.value, q,
     (chunk) => {
-      const msg = chatMessages.value[msgIndex]
-      if (msg) {
-        msg.content += chunk
-        chatMessages.value.splice(msgIndex, 1, { ...msg })
-      }
+      streamBuffer += chunk
+      startTypewriter()
     },
     () => {
-      const elapsed = Date.now() - streamStartTime
-      console.log('[Chat] 流式对话完成，耗时:', elapsed, 'ms')
-      chatLoading.value = false
-      const msg = chatMessages.value[msgIndex]
-      if (msg) {
-        if (!msg.content) {
-          msg.content = '抱歉，AI 返回为空。'
-        }
-        chatMessages.value.splice(msgIndex, 1, { ...msg })
-      }
+      streamDone = true
     },
     (err) => {
+      if (typeTimer) { clearInterval(typeTimer); typeTimer = null }
+      streamBuffer = ''
+      streamDone = true
       chatLoading.value = false
       const msg = chatMessages.value[msgIndex]
       if (msg) {

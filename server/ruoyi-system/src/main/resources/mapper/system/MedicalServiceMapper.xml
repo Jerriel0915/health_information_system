@@ -8,7 +8,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="id"    column="id"    />
         <result property="serviceCode"    column="service_code"    />
         <result property="orgId"    column="org_id"    />
-        <result property="patientName"    column="patient_name"    />
+        <result property="serviceCategory"    column="service_category"    />
         <result property="patientGender"    column="patient_gender"    />
         <result property="orgName"    column="org_name"    />
         <result property="patientAge"    column="patient_age"    />
@@ -26,7 +26,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     </resultMap>
 
     <sql id="selectMedicalServiceVo">
-        select s.id, s.service_code, s.org_id, i.org_name, s.patient_name, s.patient_gender, s.patient_age, s.service_type, s.department, s.diagnosis_code, s.diagnosis_name, s.doctor_id, s.service_date, s.discharge_date, s.days_in_hospital, s.service_status, s.created_at, s.updated_at from medical_service s left join medical_institution i on s.org_id = i.id
+        select s.id, s.service_code, s.org_id, i.org_name, s.service_category, s.patient_gender, s.patient_age, s.service_type, s.department, s.diagnosis_code, s.diagnosis_name, s.doctor_id, s.service_date, s.discharge_date, s.days_in_hospital, s.service_status, s.created_at, s.updated_at from medical_service s left join medical_institution i on s.org_id = i.id
     </sql>
 
     <select id="selectMedicalServiceList" parameterType="MedicalService" resultMap="MedicalServiceResult">
@@ -34,7 +34,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <where>  
             <if test="serviceCode != null  and serviceCode != ''"> and service_code = #{serviceCode}</if>
             <if test="orgId != null "> and org_id = #{orgId}</if>
-            <if test="patientName != null  and patientName != ''"> and patient_name like concat('%', #{patientName}, '%')</if>
+            <if test="serviceCategory != null  and serviceCategory != ''"> and service_category like concat('%', #{serviceCategory}, '%')</if>
             <if test="patientGender != null "> and patient_gender = #{patientGender}</if>
             <if test="patientAge != null "> and patient_age = #{patientAge}</if>
             <if test="serviceType != null  and serviceType != ''"> and service_type = #{serviceType}</if>
@@ -61,7 +61,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <trim prefix="(" suffix=")" suffixOverrides=",">
             <if test="serviceCode != null and serviceCode != ''">service_code,</if>
             <if test="orgId != null">org_id,</if>
-            <if test="patientName != null">patient_name,</if>
+            <if test="serviceCategory != null">service_category,</if>
             <if test="patientGender != null">patient_gender,</if>
             <if test="patientAge != null">patient_age,</if>
             <if test="serviceType != null and serviceType != ''">service_type,</if>
@@ -79,7 +79,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <trim prefix="values (" suffix=")" suffixOverrides=",">
             <if test="serviceCode != null and serviceCode != ''">#{serviceCode},</if>
             <if test="orgId != null">#{orgId},</if>
-            <if test="patientName != null">#{patientName},</if>
+            <if test="serviceCategory != null">#{serviceCategory},</if>
             <if test="patientGender != null">#{patientGender},</if>
             <if test="patientAge != null">#{patientAge},</if>
             <if test="serviceType != null and serviceType != ''">#{serviceType},</if>
@@ -101,7 +101,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <trim prefix="SET" suffixOverrides=",">
             <if test="serviceCode != null and serviceCode != ''">service_code = #{serviceCode},</if>
             <if test="orgId != null">org_id = #{orgId},</if>
-            <if test="patientName != null">patient_name = #{patientName},</if>
+            <if test="serviceCategory != null">service_category = #{serviceCategory},</if>
             <if test="patientGender != null">patient_gender = #{patientGender},</if>
             <if test="patientAge != null">patient_age = #{patientAge},</if>
             <if test="serviceType != null and serviceType != ''">service_type = #{serviceType},</if>
@@ -137,8 +137,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         select
             count(*) as totalServices,
             count(distinct service_type) as typeCount,
-            sum(case when patient_name = '门诊' then 1 else 0 end) as outpatientCount,
-            sum(case when patient_name = '住院' then 1 else 0 end) as inpatientCount,
+            sum(case when service_category = '门诊' then 1 else 0 end) as outpatientCount,
+            sum(case when service_category = '住院' then 1 else 0 end) as inpatientCount,
             round(avg(days_in_hospital), 1) as avgDaysInHospital
         from medical_service
         <where>

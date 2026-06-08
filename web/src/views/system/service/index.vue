@@ -12,14 +12,14 @@
     </el-row>
 
     <el-form :model="queryParams" size="small" :inline="true" label-width="80px">
-      <el-form-item label="患者姓名"><el-input v-model="queryParams.patientName" placeholder="请输入患者姓名" clearable /></el-form-item>
+      <el-form-item label="服务类别"><el-input v-model="queryParams.serviceCategory" placeholder="请输入服务类别" clearable /></el-form-item>
       <el-form-item><el-button type="primary" @click="handleQuery">搜索</el-button><el-button @click="resetQuery">重置</el-button></el-form-item>
     </el-form>
 
     <el-row :gutter="10" class="mb8"><el-col :span="1.5"><el-button type="primary" plain @click="handleAdd">新增</el-button></el-col><el-col :span="1.5"><el-button type="success" plain :disabled="single" @click="handleUpdate">修改</el-button></el-col><el-col :span="1.5"><el-button type="danger" plain :disabled="multiple" @click="handleDelete">删除</el-button></el-col></el-row>
 
     <el-table v-loading="loading" :data="list" @selection-change="handleSelectionChange">
-      <el-table-column type="selection" width="55" /><el-table-column label="序号" prop="id" width="80" /><el-table-column label="服务编码" prop="serviceCode" /><el-table-column label="患者姓名" prop="patientName" /><el-table-column label="性别"><template #default="{ row }">{{ row.patientGender === 1 ? '男' : row.patientGender === 2 ? '女' : '' }}</template></el-table-column><el-table-column label="年龄" prop="patientAge" /><el-table-column label="服务类型" prop="serviceType" /><el-table-column label="所属机构" prop="orgName" show-overflow-tooltip /><el-table-column label="诊断名称" prop="diagnosisName" show-overflow-tooltip /><el-table-column label="操作" width="150"><template #default="{ row }"><el-button link type="primary" size="small" @click="handleUpdate(row)">编辑</el-button><el-button link type="danger" size="small" @click="handleDelete(row)">删除</el-button></template></el-table-column>
+      <el-table-column type="selection" width="55" /><el-table-column label="序号" prop="id" width="80" /><el-table-column label="服务编码" prop="serviceCode" /><el-table-column label="服务类别" prop="serviceCategory" /><el-table-column label="性别"><template #default="{ row }">{{ row.patientGender === 1 ? '男' : row.patientGender === 2 ? '女' : '' }}</template></el-table-column><el-table-column label="年龄" prop="patientAge" /><el-table-column label="服务类型" prop="serviceType" /><el-table-column label="所属机构" prop="orgName" show-overflow-tooltip /><el-table-column label="诊断名称" prop="diagnosisName" show-overflow-tooltip /><el-table-column label="操作" width="150"><template #default="{ row }"><el-button link type="primary" size="small" @click="handleUpdate(row)">编辑</el-button><el-button link type="danger" size="small" @click="handleDelete(row)">删除</el-button></template></el-table-column>
     </el-table>
     <pagination v-show="total>0" v-model:page="queryParams.pageNum" v-model:limit="queryParams.pageSize" :total="total" @pagination="getList" />
 
@@ -27,7 +27,7 @@
       <el-form ref="formRef" :model="form" :rules="rules" label-width="100px">
         <el-row>
           <el-col :span="12"><el-form-item label="服务编码" prop="serviceCode"><el-input v-model="form.serviceCode" placeholder="请输入服务编码" /></el-form-item></el-col>
-          <el-col :span="12"><el-form-item label="患者姓名" prop="patientName"><el-input v-model="form.patientName" placeholder="请输入患者姓名" /></el-form-item></el-col>
+          <el-col :span="12"><el-form-item label="服务类别" prop="serviceCategory"><el-input v-model="form.serviceCategory" placeholder="请输入服务类别" /></el-form-item></el-col>
         </el-row>
         <el-row>
           <el-col :span="12"><el-form-item label="性别" prop="patientGender"><el-select v-model="form.patientGender" placeholder="请选择性别" style="width: 100%;"><el-option :label="'男'" :value="1" /><el-option :label="'女'" :value="2" /></el-select></el-form-item></el-col>
@@ -69,7 +69,7 @@ const form = ref({})
 const formRef = ref(null)
 const submitLoading = ref(false)
 const orgOptions = ref([])
-const rules = { serviceCode: [{ required: true, message: '请填写服务编码' }], patientName: [{ required: true, message: '请填写患者姓名' }], serviceType: [{ required: true, message: '请选择服务类型' }] }
+const rules = { serviceCode: [{ required: true, message: '请填写服务编码' }], serviceCategory: [{ required: true, message: '请填写服务类别' }], serviceType: [{ required: true, message: '请选择服务类型' }] }
 
 const formatNumber = (val) => {
   if (!val && val !== 0) return '--'
@@ -124,7 +124,7 @@ const handleUpdate = async (row) => {
   form.value = {
     id: row.id,
     serviceCode: row.serviceCode,
-    patientName: row.patientName,
+    serviceCategory: row.serviceCategory,
     patientGender: row.patientGender != null ? Number(row.patientGender) : null,
     patientAge: row.patientAge,
     serviceType: row.serviceType,

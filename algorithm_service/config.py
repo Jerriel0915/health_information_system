@@ -22,6 +22,6 @@ class Settings:
     db_port: int = 3306
     db_name: str = "health_data_manager"
     db_user: str = "root"
-    db_pass: str = "l123456789"
+    db_pass: str = "775118"
 
 settings = Settings()

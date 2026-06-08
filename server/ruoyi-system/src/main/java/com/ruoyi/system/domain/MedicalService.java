@@ -22,8 +22,8 @@ public class MedicalService extends BaseEntity
     @Excel(name = "机构名称")
     private String orgName;
 
-    @Excel(name = "患者姓名")
-    private String patientName;
+    @Excel(name = "服务类别")
+    private String serviceCategory;
 
     @Excel(name = "患者性别")
     private Long patientGender;
@@ -71,8 +71,8 @@ public class MedicalService extends BaseEntity
     public Long getOrgId() { return orgId; }
     public void setOrgName(String orgName) { this.orgName = orgName; }
     public String getOrgName() { return orgName; }
-    public void setPatientName(String patientName) { this.patientName = patientName; }
-    public String getPatientName() { return patientName; }
+    public void setServiceCategory(String serviceCategory) { this.serviceCategory = serviceCategory; }
+    public String getServiceCategory() { return serviceCategory; }
     public void setPatientGender(Long patientGender) { this.patientGender = patientGender; }
     public Long getPatientGender() { return patientGender; }
     public void setPatientAge(Long patientAge) { this.patientAge = patientAge; }
@@ -107,7 +107,7 @@ public class MedicalService extends BaseEntity
             .append("serviceCode", getServiceCode())
             .append("orgId", getOrgId())
             .append("orgName", getOrgName())
-            .append("patientName", getPatientName())
+            .append("serviceCategory", getServiceCategory())
             .append("patientGender", getPatientGender())
             .append("patientAge", getPatientAge())
             .append("serviceType", getServiceType())

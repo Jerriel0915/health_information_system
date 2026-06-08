@@ -294,7 +294,7 @@ INSERT INTO `gen_table_column` VALUES (55, 5, 'updated_at', NULL, 'datetime', 'D
 INSERT INTO `gen_table_column` VALUES (56, 6, 'id', '??', 'bigint', 'Long', 'id', '1', '1', '0', '1', NULL, NULL, NULL, 'EQ', 'input', '', 1, 'admin', '2026-05-27 15:20:33', '', NULL);
 INSERT INTO `gen_table_column` VALUES (57, 6, 'service_code', '?????', 'varchar(30)', 'String', 'serviceCode', '0', '0', '1', '1', '1', '1', '1', 'EQ', 'input', '', 2, 'admin', '2026-05-27 15:20:33', '', NULL);
 INSERT INTO `gen_table_column` VALUES (58, 6, 'org_id', '???? ID', 'bigint', 'Long', 'orgId', '0', '0', '1', '1', '1', '1', '1', 'EQ', 'input', '', 3, 'admin', '2026-05-27 15:20:33', '', NULL);
-INSERT INTO `gen_table_column` VALUES (59, 6, 'patient_name', '????', 'varchar(50)', 'String', 'patientName', '0', '0', '0', '1', '1', '1', '1', 'LIKE', 'input', '', 4, 'admin', '2026-05-27 15:20:33', '', NULL);
+INSERT INTO `gen_table_column` VALUES (59, 6, 'service_category', '服务类别', 'varchar(50)', 'String', 'serviceCategory', '0', '0', '0', '1', '1', '1', '1', 'LIKE', 'input', '', 4, 'admin', '2026-05-27 15:20:33', '', NULL);
 INSERT INTO `gen_table_column` VALUES (60, 6, 'patient_gender', '????', 'tinyint', 'Long', 'patientGender', '0', '0', '0', '1', '1', '1', '1', 'EQ', 'input', '', 5, 'admin', '2026-05-27 15:20:33', '', NULL);
 INSERT INTO `gen_table_column` VALUES (61, 6, 'patient_age', '????', 'int', 'Long', 'patientAge', '0', '0', '0', '1', '1', '1', '1', 'EQ', 'input', '', 6, 'admin', '2026-05-27 15:20:33', '', NULL);
 INSERT INTO `gen_table_column` VALUES (62, 6, 'service_type', '????', 'varchar(50)', 'String', 'serviceType', '0', '0', '1', '1', '1', '1', '1', 'EQ', 'select', '', 7, 'admin', '2026-05-27 15:20:33', '', NULL);
@@ -44671,7 +44671,7 @@ CREATE TABLE `medical_service`  (
   `id` bigint NOT NULL AUTO_INCREMENT COMMENT '??',
   `service_code` varchar(30) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL COMMENT '?????',
   `org_id` bigint NOT NULL COMMENT '???? ID',
-  `patient_name` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL COMMENT '????',
+  `service_category` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL COMMENT '服务类别:门诊/住院/急诊',
   `patient_gender` tinyint NULL DEFAULT NULL COMMENT '????',
   `patient_age` int NULL DEFAULT NULL COMMENT '????',
   `service_type` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL COMMENT '????',
