@@ -52,4 +52,5 @@ build/
 # Python
 __pycache__/
 .venv/
-
+# test report
+htmlReport
