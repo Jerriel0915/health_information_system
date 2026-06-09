@@ -1,6 +1,6 @@
 <template>
   <div style="padding: 20px">
-    <h2>骨科X光图像分类测试</h2>
+    <h2>肺炎X光图像分类测试</h2>
 
     <input type="file" @change="uploadImage" accept="image/*" />
 
