@@ -110,6 +110,11 @@ public class SysLoginService
     public void validateCaptcha(String username, String code, String uuid)
     {
         boolean captchaEnabled = configService.selectCaptchaEnabled();
+        // 前端未传验证码时直接跳过校验
+        if (captchaEnabled && StringUtils.isEmpty(code) && StringUtils.isEmpty(uuid))
+        {
+            return;
+        }
         if (captchaEnabled)
         {
             String verifyKey = CacheConstants.CAPTCHA_CODE_KEY + StringUtils.nvl(uuid, "");

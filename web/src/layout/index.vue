@@ -1,6 +1,5 @@
-<template>
+﻿<template>
   <div class="app-wrapper">
-    <!-- 侧边栏 -->
     <div class="sidebar-container">
       <div class="logo">
         <span>健康大数据系统</span>
@@ -60,14 +59,23 @@
       </el-menu>
     </div>
 
-    <!-- 右侧内容区 -->
     <div class="main-container">
       <div class="navbar">
         <div class="right-menu">
-          <span class="username">
-            <el-icon><User /></el-icon>
-            管理员
-          </span>
+          <el-dropdown trigger="click" @command="handleCommand">
+            <span class="username">
+              <el-icon><User /></el-icon>
+              {{ userName }}
+              <el-icon><ArrowDown /></el-icon>
+            </span>
+            <template #dropdown>
+              <el-dropdown-menu>
+                <el-dropdown-item command="logout">
+                  <el-icon><SwitchButton /></el-icon> 退出登录
+                </el-dropdown-item>
+              </el-dropdown-menu>
+            </template>
+          </el-dropdown>
         </div>
       </div>
       <div class="app-main">
@@ -78,6 +86,10 @@
 </template>
 
 <script setup>
+import { ref, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { removeToken } from '@/utils/auth'
 import {
   HomeFilled,
   Setting,
@@ -88,8 +100,34 @@ import {
   Money,
   UserFilled,
   Location,
-  Cpu
+  Cpu,
+  ArrowDown,
+  SwitchButton
 } from '@element-plus/icons-vue'
+
+const router = useRouter()
+const userName = ref('管理员')
+
+onMounted(() => {
+  try {
+    const userStr = localStorage.getItem('user-info')
+    if (userStr) {
+      const user = JSON.parse(userStr)
+      userName.value = user.userName || user.nickName || '管理员'
+    }
+  } catch (e) {}
+})
+
+const handleCommand = (command) => {
+  if (command === 'logout') {
+    ElMessageBox.confirm('确认退出登录？', '提示').then(() => {
+      removeToken()
+      localStorage.removeItem('user-info')
+      ElMessage.success('已退出登录')
+      router.push('/login')
+    }).catch(() => {})
+  }
+}
 </script>
 
 <style scoped>

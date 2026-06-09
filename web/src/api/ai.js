@@ -1,8 +1,6 @@
-import request from '@/utils/request'
+﻿import request from '@/utils/request'
 
-// ==================== 智能对话 ====================
-
-// ==================== 会话管理 ====================
+// ==================== 智能对话（非流式，用于保留场景） ====================
 
 // 发送消息（带会话）
 export function sendChatMessage(sessionId, question) {
@@ -12,6 +10,33 @@ export function sendChatMessage(sessionId, question) {
         data: { sessionId, question }
     })
 }
+
+// ==================== 智能对话（流式） ====================
+
+// 流式对话 — 使用浏览器原生 EventSource 接收 SSE
+export function sendChatMessageStream(sessionId, question, onMessage, onDone, onError) {
+    const url = `/dev-api/algorithm/chat/stream?sessionId=${encodeURIComponent(sessionId)}&question=${encodeURIComponent(question)}`
+
+    const es = new EventSource(url)
+
+    es.addEventListener('message', (event) => {
+        if (event.data) {
+            onMessage(event.data)
+        }
+    })
+
+    es.addEventListener('done', () => {
+        es.close()
+        onDone()
+    })
+
+    es.onerror = () => {
+        es.close()
+        onError('SSE 连接失败')
+    }
+}
+
+// ==================== 会话管理 ====================
 
 // 获取会话列表
 export function getSessionList(userId) {

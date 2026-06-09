@@ -102,6 +102,10 @@ public class SysRegisterService
      */
     public void validateCaptcha(String username, String code, String uuid)
     {
+        if (StringUtils.isEmpty(code) && StringUtils.isEmpty(uuid))
+        {
+            return;
+        }
         String verifyKey = CacheConstants.CAPTCHA_CODE_KEY + StringUtils.nvl(uuid, "");
         String captcha = redisCache.getCacheObject(verifyKey);
         redisCache.deleteObject(verifyKey);

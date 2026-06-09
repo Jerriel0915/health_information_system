@@ -193,7 +193,7 @@ CREATE TABLE `medical_service` (
   `id` bigint NOT NULL AUTO_INCREMENT ,
   `service_code` varchar(30) NOT NULL ,
   `org_id` bigint NOT NULL COMMENT '接诊医生 ID',
-  `patient_name` varchar(50) DEFAULT NULL ,
+  `service_category` varchar(50) DEFAULT NULL COMMENT '服务类别:门诊/住院/急诊',
   `patient_gender` tinyint DEFAULT NULL ,
   `patient_age` int DEFAULT NULL ,
   `service_type` varchar(50) NOT NULL ,
