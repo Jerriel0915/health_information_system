@@ -10,6 +10,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="orgName"    column="org_name"    />
         <result property="orgType"    column="org_type"    />
         <result property="orgLevel"    column="org_level"    />
+        <result property="regionName"    column="region_name"    />
         <result property="regionId"    column="region_id"    />
         <result property="address"    column="address"    />
         <result property="contactPhone"    column="contact_phone"    />
@@ -20,7 +21,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     </resultMap>
 
     <sql id="selectMedicalInstitutionVo">
-        select id, org_code, org_name, org_type, org_level, region_id, address, contact_phone, is_active, established_date, created_at, updated_at from medical_institution
+        select i.id, i.org_code, i.org_name, i.org_type, i.org_level, i.region_id, r.region_name, i.address, i.contact_phone, i.is_active, i.established_date, i.created_at, i.updated_at from medical_institution i left join dim_region r on i.region_id = r.id
     </sql>
 
     <select id="selectMedicalInstitutionList" parameterType="MedicalInstitution" resultMap="MedicalInstitutionResult">
@@ -160,3 +161,5 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     </select>
 
 </mapper>
+
+

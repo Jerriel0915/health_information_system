@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <div class="page-container">
     <!-- 统计卡片 -->
     <el-row :gutter="16" class="stat-cards"><el-col :span="6" v-for="stat in stats" :key="stat.key"><el-card shadow="hover" class="stat-card"><div class="stat-card-inner"><div class="stat-title">{{ stat.title }}</div><div class="stat-value">{{ stat.value }}<span class="unit">{{ stat.unit }}</span></div></div></el-card></el-col></el-row>
@@ -142,6 +142,7 @@ const submitForm = async () => {
         const res = form.value.id ? await updateBed(form.value) : await addBed(form.value)
         if (res.code === 200) {
           ElMessage.success('操作成功')
+          await renderChart1(), renderChart2()
           dialogVisible.value = false
           getList()
         }

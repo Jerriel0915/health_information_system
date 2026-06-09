@@ -4,14 +4,14 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Configuration;
 
 /**
- * 算法模块配置 — 读取 application.yml 中的 algorithm 配置项
+ * 算法模块配置 — 优先读取 application.yml，空值时回退到环境变量
  */
 @Configuration
 @ConfigurationProperties(prefix = "algorithm")
 public class AlgorithmConfig
 {
     /** DeepSeek API Key */
-    private String deepseekApiKey;
+    private String deepseekApiKey = "";
 
     /** DeepSeek API 地址 */
     private String deepseekBaseUrl = "https://api.deepseek.com";
@@ -20,7 +20,7 @@ public class AlgorithmConfig
     private String deepseekModel = "deepseek-chat";
 
     /** 阿里云 DashScope API Key */
-    private String dashscopeApiKey;
+    private String dashscopeApiKey = "";
 
     /** 阿里云 ASR 模型 */
     private String asrModel = "paraformer-v2";
@@ -34,7 +34,12 @@ public class AlgorithmConfig
     /** TTS 音频格式 */
     private String ttsFormat = "wav";
 
-    public String getDeepseekApiKey() { return deepseekApiKey; }
+    public String getDeepseekApiKey() {
+        if (deepseekApiKey != null && !deepseekApiKey.isEmpty()) return deepseekApiKey;
+        String env = System.getenv("DEEPSEEK_API_KEY");
+        return env != null ? env : "";
+    }
+
     public void setDeepseekApiKey(String deepseekApiKey) { this.deepseekApiKey = deepseekApiKey; }
 
     public String getDeepseekBaseUrl() { return deepseekBaseUrl; }
@@ -43,7 +48,12 @@ public class AlgorithmConfig
     public String getDeepseekModel() { return deepseekModel; }
     public void setDeepseekModel(String deepseekModel) { this.deepseekModel = deepseekModel; }
 
-    public String getDashscopeApiKey() { return dashscopeApiKey; }
+    public String getDashscopeApiKey() {
+        if (dashscopeApiKey != null && !dashscopeApiKey.isEmpty()) return dashscopeApiKey;
+        String env = System.getenv("DASHSCOPE_API_KEY");
+        return env != null ? env : "";
+    }
+
     public void setDashscopeApiKey(String dashscopeApiKey) { this.dashscopeApiKey = dashscopeApiKey; }
 
     public String getAsrModel() { return asrModel; }
@@ -58,4 +68,3 @@ public class AlgorithmConfig
     public String getTtsFormat() { return ttsFormat; }
     public void setTtsFormat(String ttsFormat) { this.ttsFormat = ttsFormat; }
 }
-

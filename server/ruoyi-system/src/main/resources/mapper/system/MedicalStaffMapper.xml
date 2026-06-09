@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="UTF-8" ?>
+﻿<?xml version="1.0" encoding="UTF-8" ?>
 <!DOCTYPE mapper
 PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
@@ -9,6 +9,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="staffCode"    column="staff_code"    />
         <result property="staffName"    column="staff_name"    />
         <result property="gender"    column="gender"    />
+        <result property="orgName"    column="org_name"    />
         <result property="birthDate"    column="birth_date"    />
         <result property="orgId"    column="org_id"    />
         <result property="department"    column="department"    />
@@ -22,7 +23,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     </resultMap>
 
     <sql id="selectMedicalStaffVo">
-        select id, staff_code, staff_name, gender, birth_date, org_id, department, job_title, job_category, education, is_active, entry_date, created_at, updated_at from medical_staff
+        select s.id, s.staff_code, s.staff_name, s.gender, s.birth_date, s.org_id, i.org_name, s.department, s.job_title, s.job_category, s.education, s.is_active, s.entry_date, s.created_at, s.updated_at from medical_staff s left join medical_institution i on s.org_id = i.id
     </sql>
 
     <select id="selectMedicalStaffList" parameterType="MedicalStaff" resultMap="MedicalStaffResult">
@@ -114,9 +115,9 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         </foreach>
     </delete>
 
-    <!-- ====== 统计分析查询 ====== -->
+    <!-- ====== 缁熻鍒嗘瀽鏌ヨ ====== -->
 
-    <!-- 按职称分布 -->
+    <!-- 鎸夎亴绉板垎甯?-->
     <select id="selectStaffJobTitleDistribution" resultType="java.util.Map">
         select job_title as name, count(*) as value
         from medical_staff
@@ -126,7 +127,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         order by value desc
     </select>
 
-    <!-- 按职业类别分布 -->
+    <!-- 鎸夎亴涓氱被鍒垎甯?-->
     <select id="selectStaffCategoryDistribution" resultType="java.util.Map">
         select job_category as name, count(*) as value
         from medical_staff
@@ -136,7 +137,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         order by value desc
     </select>
 
-    <!-- 按学历分布 -->
+    <!-- 鎸夊鍘嗗垎甯?-->
     <select id="selectStaffEducationDistribution" resultType="java.util.Map">
         select education as name, count(*) as value
         from medical_staff
@@ -146,10 +147,10 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         order by value desc
     </select>
 
-    <!-- 人员性别比例 -->
+    <!-- 浜哄憳鎬у埆姣斾緥 -->
     <select id="selectStaffGenderRatio" resultType="java.util.Map">
         select
-            case when gender = 1 then '男' when gender = 2 then '女' else '未知' end as name,
+            case when gender = 1 then '鐢? when gender = 2 then '濂? else '鏈煡' end as name,
             count(*) as value
         from medical_staff
         where is_active = 1
@@ -157,7 +158,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         group by gender
     </select>
 
-    <!-- 人员总览统计 -->
+    <!-- 浜哄憳鎬昏缁熻 -->
     <select id="selectStaffSummary" resultType="java.util.Map">
         select
             count(*) as totalStaff,
@@ -171,7 +172,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         </where>
     </select>
 
-    <!-- 人员数量变化趋势 -->
+    <!-- 浜哄憳鏁伴噺鍙樺寲瓒嬪娍 -->
     <select id="selectStaffTrend" resultType="java.util.Map">
         select date_format(created_at, '%Y') as year, count(*) as value
         from medical_staff

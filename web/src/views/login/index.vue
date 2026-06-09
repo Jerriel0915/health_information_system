@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <div class="login-container">
     <div class="login-box">
       <div class="login-title">
@@ -55,8 +55,8 @@ const loginFormRef = ref(null)
 console.log('[Login] 组件已加载')
 
 const loginForm = reactive({
-  username: 'admin',
-  password: 'admin123'
+  username: '',
+  password: ''
 })
 
 const rules = {

@@ -1,97 +1,69 @@
 package com.ruoyi.web.controller;
 
 import com.ruoyi.common.core.controller.BaseController;
-import com.ruoyi.system.domain.ChatMessage;
 import com.ruoyi.common.core.domain.AjaxResult;
+import com.ruoyi.system.domain.ChatMessage;
 import com.ruoyi.system.service.AsrService;
-import com.ruoyi.system.service.ChatService;
+
 import com.ruoyi.system.service.ChatSessionService;
 import com.ruoyi.system.service.TtsService;
+import com.ruoyi.common.annotation.Anonymous;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
-import org.springframework.http.ResponseEntity;
+import org.springframework.http.*;
+import org.springframework.http.server.ServerHttpResponse;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.client.RestTemplate;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
+
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
+import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 /**
  * 算法模块 — 智能分析助手
  *
- * 集成了语音识别 (ASR) + 大模型对话 (DeepSeek) + 语音合成 (TTS)
+ * ASR/TTS 在 Java 本地处理（直接调 DashScope SDK）
+ * 对话 LLM 转发到 Python 算法服务（5001）
+ * 会话管理在 Java 本地处理
  */
 @RestController
 @RequestMapping("/algorithm")
 public class AlgorithmController extends BaseController
 {
     private static final Logger log = LoggerFactory.getLogger(AlgorithmController.class);
+    private static final String PYTHON_ALGO = "http://localhost:5001";
+    private static final ExecutorService sseExecutor = Executors.newCachedThreadPool();
 
-    private final AsrService asrService;
-    private final ChatService chatService;
+    private final RestTemplate restTemplate;
     private final ChatSessionService chatSessionService;
+    private final AsrService asrService;
     private final TtsService ttsService;
 
-    public AlgorithmController(AsrService asrService, ChatService chatService, TtsService ttsService, ChatSessionService chatSessionService)
+    public AlgorithmController(RestTemplate restTemplate, ChatSessionService chatSessionService,
+                               AsrService asrService, TtsService ttsService)
     {
-        this.asrService = asrService;
-        this.chatService = chatService;
-        this.ttsService = ttsService;
+        this.restTemplate = restTemplate;
         this.chatSessionService = chatSessionService;
+        this.asrService = asrService;
+        this.ttsService = ttsService;
     }
 
-    /**
-     * 智能对话 — 纯大模型对话
-     * POST /algorithm/chat
-     * Body: { "question": "..." }
-     * 返回: { "msg": "回答内容", "code": 200 }
-     */
-    @PostMapping("/chat")
-    public AjaxResult chat(@RequestBody Map<String, Object> body)
-    {
-        if (body == null) return error("参数不能为空");
-        String sessionId = (String) body.get("sessionId");
-        String question = (String) body.get("question");
-        if (question == null || question.trim().isEmpty()) return error("问题不能为空");
-
-        // 保存用户消息
-        if (sessionId != null) {
-            chatSessionService.saveMessage(sessionId, "user", question.trim());
-        }
-
-        // 获取历史消息
-        java.util.List<ChatMessage> history = null;
-        if (sessionId != null) {
-            history = chatSessionService.getHistory(sessionId);
-            if (history.size() > 20) {
-                history = history.subList(history.size() - 20, history.size());
-            }
-        }
-
-        // 调用 DeepSeek
-        String answer = chatService.chat(question.trim(), history);
-
-        // 保存回答
-        if (sessionId != null) {
-            chatSessionService.saveMessage(sessionId, "assistant", answer);
-        }
-
-        return success(answer);
-    }
-
-    /**
-     * 语音识别 — 纯 ASR
-     * POST /algorithm/asr
-     * 接收音频文件，返回识别文本
-     * 返回: { "msg": "识别文本", "code": 200 }
-     */
+    // ==================== 会话管理（Java 本地） ====================
 
     @PostMapping("/chat/sessions")
     public AjaxResult getSessions(@RequestBody Map<String, Object> body)
     {
         Long userId = body != null ? Long.valueOf(body.get("userId").toString()) : null;
-        if (userId == null) return error("\u7528\u6237ID\u4e0d\u80fd\u4e3a\u7a7a");
+        if (userId == null) return error("用户ID不能为空");
         return success(chatSessionService.getSessionList(userId));
     }
 
@@ -99,7 +71,7 @@ public class AlgorithmController extends BaseController
     public AjaxResult createSession(@RequestBody Map<String, Object> body)
     {
         Long userId = body != null ? Long.valueOf(body.get("userId").toString()) : null;
-        if (userId == null) return error("\u7528\u6237ID\u4e0d\u80fd\u4e3a\u7a7a");
+        if (userId == null) return error("用户ID不能为空");
         String sessionId = chatSessionService.createSession(userId);
         return success(sessionId);
     }
@@ -108,7 +80,7 @@ public class AlgorithmController extends BaseController
     public AjaxResult deleteSession(@RequestBody Map<String, Object> body)
     {
         String sessionId = body != null ? (String) body.get("sessionId") : null;
-        if (sessionId == null) return error("\u4f1a\u8bddID\u4e0d\u80fd\u4e3a\u7a7a");
+        if (sessionId == null) return error("会话ID不能为空");
         chatSessionService.deleteSession(sessionId);
         return success();
     }
@@ -117,17 +89,16 @@ public class AlgorithmController extends BaseController
     public AjaxResult getHistory(@RequestBody Map<String, Object> body)
     {
         String sessionId = body != null ? (String) body.get("sessionId") : null;
-        if (sessionId == null) return error("\u4f1a\u8bddID\u4e0d\u80fd\u4e3a\u7a7a");
+        if (sessionId == null) return error("会话ID不能为空");
         return success(chatSessionService.getHistory(sessionId));
     }
+
+    // ==================== ASR（Java 本地处理） ====================
 
     @PostMapping("/asr")
     public AjaxResult asr(@RequestParam("file") MultipartFile file)
     {
-        if (file.isEmpty())
-        {
-            return error("请上传音频文件");
-        }
+        if (file.isEmpty()) return error("请上传音频文件");
         try
         {
             String text = asrService.recognize(file);
@@ -140,19 +111,15 @@ public class AlgorithmController extends BaseController
         }
     }
 
-    /**
-     * 语音合成 — 纯 TTS
-     * POST /algorithm/tts
-     * Body: { "text": "..." }
-     * 返回音频文件流（wav 格式）
-     */
+    // ==================== TTS（Java 本地处理） ====================
+
     @PostMapping("/tts")
     public ResponseEntity<byte[]> tts(@RequestBody Map<String, String> body)
     {
         String text = body != null ? body.get("text") : null;
         if (text == null || text.trim().isEmpty())
         {
-            return ResponseEntity.badRequest().body("文本不能为空".getBytes());
+            return ResponseEntity.badRequest().body("文本不能为空".getBytes(StandardCharsets.UTF_8));
         }
         try
         {
@@ -169,70 +136,281 @@ public class AlgorithmController extends BaseController
         {
             log.error("TTS 合成失败", e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(("语音合成失败: " + e.getMessage()).getBytes());
+                    .body(("语音合成失败: " + e.getMessage()).getBytes(StandardCharsets.UTF_8));
         }
     }
 
-    /**
-     * 全链路：语音 → 对话 → 语音
-     * POST /algorithm/pipeline
-     * 接收音频文件，经过 ASR → DeepSeek → TTS，返回合成的音频
-     * 返回音频文件流（wav 格式）
-     */
+    // ==================== Pipeline（转发到 Python 算法服务） ====================
+
     @PostMapping("/pipeline")
     public ResponseEntity<byte[]> pipeline(@RequestParam("file") MultipartFile file)
     {
-        if (file.isEmpty())
-        {
-            return ResponseEntity.badRequest().body("请上传音频文件".getBytes());
-        }
         try
         {
-            // Step 1: ASR 语音识别
-            log.info("Pipeline Step 1: ASR 语音识别开始");
-            String recognizedText = asrService.recognize(file);
-            log.info("Pipeline Step 1: ASR 完成，识别文本: {}", recognizedText);
+            org.springframework.core.io.ByteArrayResource fileResource = new org.springframework.core.io.ByteArrayResource(file.getBytes())
+            {
+                @Override
+                public String getFilename() { return file.getOriginalFilename(); }
+            };
 
-            // 构造一个完整的查询上下文
-            String question = "请根据以下内容进行分析和回答：\n" + recognizedText;
+            org.springframework.util.LinkedMultiValueMap<String, Object> form = new org.springframework.util.LinkedMultiValueMap<>();
+            form.add("file", fileResource);
 
-            // Step 2: DeepSeek 对话
-            log.info("Pipeline Step 2: 大模型对话开始");
-            String answer = chatService.chat(question, null);
-            log.info("Pipeline Step 2: 大模型回答完成，长度: {}", answer.length());
-
-            // Step 3: TTS 语音合成
-            log.info("Pipeline Step 3: TTS 语音合成开始");
-            byte[] audioData = ttsService.synthesize(answer);
-            log.info("Pipeline Step 3: TTS 合成完成，大小: {} bytes", audioData.length);
-
-            // 在响应头中附加识别文本和回答，方便前端展示
             HttpHeaders headers = new HttpHeaders();
-            headers.setContentType(MediaType.parseMediaType("audio/wav"));
-            headers.setContentLength(audioData.length);
-            headers.set("X-Asr-Text", java.net.URLEncoder.encode(recognizedText, "UTF-8"));
-            headers.set("X-Answer-Text", java.net.URLEncoder.encode(answer, "UTF-8"));
+            headers.setContentType(MediaType.MULTIPART_FORM_DATA);
+            HttpEntity<org.springframework.util.LinkedMultiValueMap<String, Object>> request =
+                    new HttpEntity<>(form, headers);
 
-            return new ResponseEntity<>(audioData, headers, HttpStatus.OK);
+            ResponseEntity<byte[]> response = restTemplate.postForEntity(
+                    PYTHON_ALGO + "/pipeline", request, byte[].class);
+
+            HttpHeaders respHeaders = new HttpHeaders();
+            respHeaders.setContentType(MediaType.parseMediaType("audio/wav"));
+            if (response.getBody() != null)
+            {
+                respHeaders.setContentLength(response.getBody().length);
+            }
+            if (response.getHeaders().containsHeader("X-Asr-Text"))
+            {
+                respHeaders.set("X-Asr-Text", response.getHeaders().getFirst("X-Asr-Text"));
+            }
+            if (response.getHeaders().containsHeader("X-Answer-Text"))
+            {
+                respHeaders.set("X-Answer-Text", response.getHeaders().getFirst("X-Answer-Text"));
+            }
+
+            return new ResponseEntity<>(response.getBody(), respHeaders, HttpStatus.OK);
         }
         catch (Exception e)
         {
-            log.error("Pipeline 全链路执行失败", e);
+            log.error("Pipeline 转发失败", e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(("全链路执行失败: " + e.getMessage()).getBytes());
+                    .body(("全链路执行失败: " + e.getMessage()).getBytes(StandardCharsets.UTF_8));
         }
     }
 
-    // 保留原有的图像分类和目标检测接口（占位）
+    // ==================== LLM 对话（转发到 Python 算法服务 5001） ====================
+
+    @Anonymous
+    @GetMapping("/chat/stream")
+    public SseEmitter chatStream(
+            @RequestParam("sessionId") String sessionId,
+            @RequestParam("question") String question)
+    {
+        SseEmitter emitter = new SseEmitter(300000L) {
+            @Override
+            protected void extendResponse(ServerHttpResponse outputMessage) {
+                super.extendResponse(outputMessage);
+                outputMessage.getHeaders().set("X-Accel-Buffering", "no");
+                outputMessage.getHeaders().set("Cache-Control", "no-cache, no-transform");
+                outputMessage.getHeaders().set("Connection", "keep-alive");
+            }
+        };
+
+        if (sessionId != null && !sessionId.isEmpty()) {
+            chatSessionService.saveMessage(sessionId, "user", question.trim());
+        }
+
+        StringBuilder fullAnswer = new StringBuilder();
+
+        sseExecutor.execute(() -> {
+            try
+            {
+                String url = PYTHON_ALGO + "/chat/stream?question="
+                        + URLEncoder.encode(question, "UTF-8")
+                        + "&session_id=" + URLEncoder.encode(sessionId, "UTF-8");
+
+                URL targetUrl = new URL(url);
+                HttpURLConnection conn = (HttpURLConnection) targetUrl.openConnection(java.net.Proxy.NO_PROXY);
+                conn.setRequestMethod("GET");
+                conn.setRequestProperty("Accept", "text/event-stream");
+                conn.setConnectTimeout(30000);
+                conn.setReadTimeout(60000);
+
+                int responseCode = conn.getResponseCode();
+                if (responseCode != 200)
+                {
+                    try (BufferedReader errReader = new BufferedReader(
+                            new InputStreamReader(conn.getErrorStream(), StandardCharsets.UTF_8)))
+                    {
+                        StringBuilder errBody = new StringBuilder();
+                        String line;
+                        while ((line = errReader.readLine()) != null) errBody.append(line);
+                        log.error("算法服务返回错误: {} body: {}", responseCode, errBody);
+                    }
+                    emitter.send(SseEmitter.event().name("error").data("AI 服务返回错误: " + responseCode));
+                    emitter.complete();
+                    return;
+                }
+
+                try (BufferedReader reader = new BufferedReader(
+                        new InputStreamReader(conn.getInputStream(), StandardCharsets.UTF_8)))
+                {
+                    String line;
+                    while ((line = reader.readLine()) != null)
+                    {
+                        if (line.startsWith("data: "))
+                        {
+                            String data = line.substring(6).trim();
+                            if ("[DONE]".equals(data))
+                            {
+                                emitter.send(SseEmitter.event().name("done").data("[DONE]"));
+                                break;
+                            }
+                            fullAnswer.append(data);
+                            emitter.send(SseEmitter.event().name("message").data(data));
+                        }
+                    }
+                }
+                emitter.complete();
+
+                if (sessionId != null && !sessionId.isEmpty() && fullAnswer.length() > 0) {
+                    chatSessionService.saveMessage(sessionId, "assistant", fullAnswer.toString());
+                }
+            }
+            catch (Exception e)
+            {
+                log.error("流式对话转发失败", e);
+                try { emitter.send(SseEmitter.event().name("error").data("AI 服务异常: " + e.getMessage())); }
+                catch (Exception ignored) {}
+                emitter.completeWithError(new RuntimeException(e));
+            }
+        });
+
+        return emitter;
+    }
+
+    @PostMapping("/chat")
+    public AjaxResult chat(@RequestBody Map<String, Object> body)
+    {
+        if (body == null) return error("参数不能为空");
+        String sessionId = (String) body.get("sessionId");
+        String question = (String) body.get("question");
+        if (question == null || question.trim().isEmpty()) return error("问题不能为空");
+
+        if (sessionId != null) {
+            chatSessionService.saveMessage(sessionId, "user", question.trim());
+        }
+
+        try
+        {
+            org.springframework.util.LinkedMultiValueMap<String, String> form = new org.springframework.util.LinkedMultiValueMap<>();
+            form.add("question", question);
+            form.add("session_id", sessionId != null ? sessionId : "");
+
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.MULTIPART_FORM_DATA);
+            HttpEntity<org.springframework.util.LinkedMultiValueMap<String, String>> request =
+                    new HttpEntity<>(form, headers);
+
+            Map response = restTemplate.postForObject(PYTHON_ALGO + "/chat", request, Map.class);
+            String answer = "";
+            if (response != null && Integer.valueOf(200).equals(response.get("code")))
+            {
+                answer = (String) response.get("data");
+            }
+            else
+            {
+                String msg = response != null ? (String) response.get("msg") : "未知错误";
+                return error("AI 服务错误: " + msg);
+            }
+
+            if (sessionId != null && answer != null) {
+                chatSessionService.saveMessage(sessionId, "assistant", answer);
+            }
+
+            return success(answer);
+        }
+        catch (Exception e)
+        {
+            log.error("对话转发失败", e);
+            return error("AI 服务异常: " + e.getMessage());
+        }
+    }
+
+    // ==================== 图像分类 / 异常检测（转发到 Python 算法服务） ====================
+
     @PostMapping("/image-classify")
     public AjaxResult imageClassify(@RequestParam("file") MultipartFile file)
     {
-        return success("接口已预留，待接入图像分类模型");
+        try {
+            org.springframework.core.io.ByteArrayResource fileResource = new org.springframework.core.io.ByteArrayResource(file.getBytes())
+            {
+                @Override
+                public String getFilename() { return file.getOriginalFilename(); }
+            };
+
+            org.springframework.util.LinkedMultiValueMap<String, Object> form = new org.springframework.util.LinkedMultiValueMap<>();
+            form.add("file", fileResource);
+
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.MULTIPART_FORM_DATA);
+            HttpEntity<org.springframework.util.LinkedMultiValueMap<String, Object>> request =
+                    new HttpEntity<>(form, headers);
+
+            Map response = restTemplate.postForObject(PYTHON_ALGO + "/classify", request, Map.class);
+            if (response != null && Integer.valueOf(200).equals(response.get("code")))
+            {
+                return success(response.get("data"));
+            }
+            return success(response);
+        }
+        catch (Exception e)
+        {
+            log.error("图像分类转发失败", e);
+            return error("图像分类服务异常: " + e.getMessage());
+        }
     }
 
-    @PostMapping("/object-detect")
-    public AjaxResult objectDetect(@RequestParam("file") MultipartFile file)
+    // ==================== 骨骼分类 ====================
+    @PostMapping("/predict")
+    public AjaxResult predict(@RequestParam("file") MultipartFile file)
     {
-        return success("接口已预留，待接入目标检测模型");
+        try {
+            org.springframework.core.io.ByteArrayResource fileResource = new org.springframework.core.io.ByteArrayResource(file.getBytes())
+            {
+                @Override
+                public String getFilename() { return file.getOriginalFilename(); }
+            };
+
+            org.springframework.util.LinkedMultiValueMap<String, Object> form = new org.springframework.util.LinkedMultiValueMap<>();
+            form.add("file", fileResource);
+
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.MULTIPART_FORM_DATA);
+            HttpEntity<org.springframework.util.LinkedMultiValueMap<String, Object>> request =
+                new HttpEntity<>(form, headers);
+
+            Map response = restTemplate.postForObject(PYTHON_ALGO + "/predict", request, Map.class);
+            if (response != null && Integer.valueOf(200).equals(response.get("code")))
+            {
+                return success(response.get("data"));
+            }
+            return success(response);
+        }
+        catch (Exception e)
+        {
+            log.error("骨骼分类转发失败", e);
+            return error("骨骼分类服务异常: " + e.getMessage());
+        }
+    }
+
+        @PostMapping("/object-detect")
+    public AjaxResult objectDetect()
+    {
+        try
+        {
+            Map response = restTemplate.postForObject(PYTHON_ALGO + "/detect", null, Map.class);
+            if (response != null && Integer.valueOf(200).equals(response.get("code")))
+            {
+                return success(response.get("data"));
+            }
+            return success(response);
+        }
+        catch (Exception e)
+        {
+            log.error("异常检测转发失败", e);
+            return error("异常检测服务异常: " + e.getMessage());
+        }
     }
 }

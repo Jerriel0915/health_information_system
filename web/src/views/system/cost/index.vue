@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <div class="page-container">
     <el-row :gutter="16" class="stat-cards">
       <el-col :span="6" v-for="item in stats" :key="item.title">
@@ -159,6 +159,7 @@ const submitForm = async () => {
         const res = form.value.id ? await updateCost(form.value) : await addCost(form.value)
         if (res.code === 200) {
           ElMessage.success('操作成功')
+          await renderCompositionChart(), renderTrendChart()
           dialogVisible.value = false
           getList()
         }
