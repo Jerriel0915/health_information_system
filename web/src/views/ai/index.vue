@@ -104,10 +104,49 @@
         </div>
       </el-tab-pane>
       <el-tab-pane name="image">
-        <template #label><span><el-icon><Picture /></el-icon> 图像分类</span></template>
+        <template #label><span><el-icon><Picture /></el-icon> 医疗器械分类测试</span></template>
         <div class="image-container"><el-row :gutter="24">
           <el-col :span="12"><div class="image-card"><div class="image-title">上传医疗图像</div><el-upload action="#" :before-upload="handleImageUpload" accept="image/*" :show-file-list="false" drag><el-icon><UploadFilled /></el-icon><div class="el-upload__text">将图像拖到此处，或<em>点击上传</em></div></el-upload><div v-if="uploadedImage" class="image-preview"><img :src="uploadedImage"><el-button type="danger" size="small" circle @click="clearImage" class="clear-btn"><el-icon><Close /></el-icon></el-button></div></div></el-col>
-          <el-col :span="12"><div class="image-card"><div class="image-title">分类结果</div><div v-if="imageClassifying" v-loading="imageClassifying" class="result-loading">正在分析图像...</div><div v-else-if="imageResult" class="image-result"><div><span class="label">类别：</span><el-tag type="primary">{{ imageResult.category }}</el-tag></div><div><span class="label">置信度：</span><el-progress :percentage="imageResult.confidence" /></div><div><span class="label">描述：</span><p>{{ imageResult.description }}</p></div></div><el-empty v-else description="等待上传图像" /></div></el-col>
+          <el-col :span="12"><div class="image-card"><div class="image-title">分类结果</div>
+            <div v-if="imageClassifying" v-loading="imageClassifying" class="result-loading">正在分析图像...</div>
+            <div v-else-if="imageResult" class="image-result">
+              <div class="result-header">
+                <el-tag type="success" size="large" effect="dark" class="result-tag">{{ categoryMap[imageResult.category] || imageResult.category }}</el-tag>
+                <span class="result-conf">{{ imageResult.confidence }}%</span>
+              </div>
+              <div class="result-desc">{{ imageResult.description }}</div>
+              <div class="ranking-title">置信度排名</div>
+              <div class="ranking-list">
+                <div v-for="(item, idx) in imageResult.ranking" :key="idx" class="ranking-item" :class="{ active: item.category === imageResult.category }">
+                  <span class="ranking-index">{{ idx + 1 }}</span>
+                  <span class="ranking-name">{{ categoryMap[item.category] || item.category }}</span>
+                  <el-progress :percentage="item.confidence" :show-text="false" :stroke-width="6" />
+                  <span class="ranking-conf">{{ item.confidence }}%</span>
+                </div>
+              </div>
+            </div>
+            <el-empty v-else description="等待上传图像" />
+          </div></el-col>
+        </el-row></div>
+      </el-tab-pane>
+            <!-- 肺炎X光分类测试 -->
+      <el-tab-pane name="bone">
+        <template #label><span><el-icon><Tools /></el-icon> 肺炎X光分类测试</span></template>
+        <div class="image-container"><el-row :gutter="24">
+          <el-col :span="12"><div class="image-card"><div class="image-title">上传肺部X光图像</div><el-upload action="#" :before-upload="handleBoneUpload" accept="image/*" :show-file-list="false" drag><el-icon><UploadFilled /></el-icon><div class="el-upload__text">将肺部X光图像拖到此处，或<em>点击上传</em></div></el-upload><div v-if="boneUploadedImage" class="image-preview"><img :src="boneUploadedImage"><el-button type="danger" size="small" circle @click="clearBoneImage" class="clear-btn"><el-icon><Close /></el-icon></el-button></div></div></el-col>
+          <el-col :span="12"><div class="image-card"><div class="image-title">分类结果</div>
+            <div v-if="boneClassifying" v-loading="boneClassifying" class="result-loading">正在分析肺部图像...</div>
+            <div v-else-if="boneResult" class="image-result">
+              <div class="result-header">
+                <el-tag :type="boneResult.class_name === '正常' ? 'success' : 'danger'" size="large" effect="dark" class="result-tag">{{ boneResult.class_name }}</el-tag>
+                <span class="result-conf">{{ (boneResult.confidence * 100).toFixed(1) }}%</span>
+              </div>
+              <div style="text-align:center;padding:10px 0;color:#606266;font-size:14px;">
+                {{ boneResult.class_name === '正常' ? '肺部结构未见明显异常' : '检测到肺炎特征，建议进一步检查' }}
+              </div>
+            </div>
+            <el-empty v-else description="等待上传肺部X光图像" />
+          </div></el-col>
         </el-row></div>
       </el-tab-pane>
       <el-tab-pane name="detection">
@@ -137,8 +176,8 @@
 <script setup>
 import { ref, nextTick, onMounted, watch } from 'vue'
 import { ElMessage } from 'element-plus'
-import { Cpu, ChatDotRound, User, Microphone, Close, Headset, Picture, UploadFilled, Warning, FolderOpened, Document, Plus, Delete } from '@element-plus/icons-vue'
-import { sendChatMessage, sendChatMessageStream, speechToText, textToSpeech, getSessionList, createSession, deleteSession, getChatHistory } from '@/api/ai'
+import { Cpu, ChatDotRound, User, Microphone, Close, Headset, Picture, UploadFilled, Warning, FolderOpened, Document, Plus, Delete, Tools } from '@element-plus/icons-vue'
+import { sendChatMessage, sendChatMessageStream, speechToText, textToSpeech, getSessionList, createSession, deleteSession, getChatHistory, boneClassify, imageClassify, runAnomalyDetection } from '@/api/ai'
 
 const activeTab = ref('chat')
 const chatMessages = ref([{ role: 'assistant', content: '你好！我是数据分析助手，可以帮你查询床位、费用、服务量等数据。', time: new Date().toLocaleTimeString() }])
@@ -157,6 +196,19 @@ const ttsReportType = ref('bed')
 const ttsReportContent = ref('')
 const ttsSpeaking = ref(false)
 const uploadedImage = ref(null)
+// 医疗设备中英文映射
+const categoryMap = {
+  'blood pressure set': '血压计',
+  'breast pump': '吸奶器',
+  'commode': '坐便椅',
+  'crutch': '拐杖',
+  'glucometer': '血糖仪',
+  'oximeter': '血氧仪',
+  'rippled mattress': '防褥疮床垫',
+  'therapeutic ultrasound machine': '治疗性超声设备',
+  'thermometer': '体温计',
+  'unknown': '无法识别'
+}
 const imageResult = ref(null)
 const imageClassifying = ref(false)
 const detectLoading = ref(false)
@@ -409,9 +461,68 @@ const speakReport = async () => {
 
 const stopSpeak = () => { window.speechSynthesis?.cancel(); ttsSpeaking.value = false }
 
-const handleImageUpload = (file) => { ElMessage.info('图像分类功能待后续更新'); return false }
+const handleImageUpload = async (file) => {
+  uploadedImage.value = URL.createObjectURL(file)
+  imageClassifying.value = true
+  imageResult.value = null
+  try {
+    const res = await imageClassify(file)
+    if (res.code === 200) {
+      imageResult.value = res.data
+    } else {
+      ElMessage.error(res.msg || '分类失败')
+    }
+  } catch (e) {
+    ElMessage.error('分类请求异常: ' + (e.message || '未知错误'))
+  } finally {
+    imageClassifying.value = false
+  }
+  return false
+}
 const clearImage = () => { uploadedImage.value = null; imageResult.value = null }
-const runDetection = () => { ElMessage.info('异常检测功能待后续更新') }
+// ==================== 骨骼分类 ====================
+const boneUploadedImage = ref(null)
+const boneClassifying = ref(false)
+const boneResult = ref(null)
+
+const handleBoneUpload = async (file) => {
+  boneUploadedImage.value = URL.createObjectURL(file)
+  boneClassifying.value = true
+  boneResult.value = null
+  try {
+    const res = await boneClassify(file)
+    if (res.code === 200) {
+      boneResult.value = res.data
+    } else {
+      ElMessage.error(res.msg || '骨骼分类失败')
+    }
+  } catch (e) {
+    ElMessage.error('骨骼分类请求异常: ' + (e.message || '未知错误'))
+  } finally {
+    boneClassifying.value = false
+  }
+  return false
+}
+const clearBoneImage = () => { boneUploadedImage.value = null; boneResult.value = null }
+
+const runDetection = async () => {
+  detectLoading.value = true
+  anomalyList.value = []
+  anomalyStats.value = { total: 0, costAnomaly: 0, visitAnomaly: 0 }
+  try {
+    const res = await runAnomalyDetection()
+    if (res.code === 200) {
+      anomalyList.value = res.data?.list || []
+      anomalyStats.value = res.data?.stats || { total: 0, costAnomaly: 0, visitAnomaly: 0 }
+    } else {
+      ElMessage.error(res.msg || '异常检测失败')
+    }
+  } catch (e) {
+    ElMessage.error('异常检测请求异常: ' + (e.message || '未知错误'))
+  } finally {
+    detectLoading.value = false
+  }
+}
 const viewDetail = (row) => { ElMessage.info('异常检测功能待后续更新') }
 
 onMounted(async () => {
@@ -480,8 +591,20 @@ onMounted(async () => {
 .image-preview { position: relative; margin-top: 20px; text-align: center; }
 .image-preview img { max-width: 100%; max-height: 300px; border-radius: 8px; }
 .clear-btn { position: absolute; top: 8px; right: 8px; }
-.image-result > div { margin-bottom: 12px; }
-.image-result .label { font-weight: 600; color: #606266; margin-right: 8px; }
+.result-loading { min-height: 200px; display: flex; align-items: center; justify-content: center; }
+.result-header { text-align: center; padding: 10px 0 16px; }
+.result-tag { font-size: 18px; padding: 8px 24px; }
+.result-conf { display: block; font-size: 28px; font-weight: 700; color: #67c23a; margin-top: 8px; }
+.result-desc { font-size: 13px; color: #606266; line-height: 1.6; padding: 10px 0 16px; border-bottom: 1px solid #eee; margin-bottom: 12px; }
+.ranking-title { font-size: 14px; font-weight: 600; color: #303133; margin-bottom: 10px; }
+.ranking-list { display: flex; flex-direction: column; gap: 8px; }
+.ranking-item { display: flex; align-items: center; gap: 10px; padding: 6px 10px; border-radius: 8px; background: #f5f7fa; }
+.ranking-item.active { background: #e6f7e6; }
+.ranking-index { width: 18px; height: 18px; border-radius: 50%; background: #dcdfe6; color: #fff; font-size: 11px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.ranking-item.active .ranking-index { background: #67c23a; }
+.ranking-name { font-size: 13px; color: #303133; width: 120px; flex-shrink: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ranking-item .el-progress { flex: 1; min-width: 0; }
+.ranking-conf { font-size: 12px; color: #909399; width: 45px; text-align: right; flex-shrink: 0; }
 
 .detection-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
 .detection-title { font-size: 18px; font-weight: 600; }
@@ -490,6 +613,11 @@ onMounted(async () => {
 .detection-stats .stat-value { font-size: 32px; font-weight: bold; }
 .detection-stats .stat-label { font-size: 14px; opacity: 0.85; margin-top: 4px; }
 </style>
+
+
+
+
+
 
 
 

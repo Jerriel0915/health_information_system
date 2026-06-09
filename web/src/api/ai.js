@@ -95,3 +95,36 @@ export function textToSpeech(text) {
         responseType: 'blob'
     })
 }
+
+// ==================== 图像分类 ====================
+export function imageClassify(file) {
+    const formData = new FormData()
+    formData.append('file', file)
+    return request({
+        url: '/algorithm/image-classify',
+        method: 'post',
+        data: formData,
+        headers: { 'Content-Type': 'multipart/form-data' }
+    })
+}
+
+
+// ==================== 骨骼分类 ====================
+export function boneClassify(file) {
+    const formData = new FormData()
+    formData.append('file', file)
+    return request({
+        url: '/algorithm/predict',
+        method: 'post',
+        data: formData,
+        headers: { 'Content-Type': 'multipart/form-data' }
+    })
+}
+
+// ==================== 异常检测 ====================
+export function runAnomalyDetection() {
+    return request({
+        url: '/algorithm/object-detect',
+        method: 'post'
+    })
+}

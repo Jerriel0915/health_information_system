@@ -362,7 +362,40 @@ public class AlgorithmController extends BaseController
         }
     }
 
-    @PostMapping("/object-detect")
+    // ==================== 骨骼分类 ====================
+    @PostMapping("/predict")
+    public AjaxResult predict(@RequestParam("file") MultipartFile file)
+    {
+        try {
+            org.springframework.core.io.ByteArrayResource fileResource = new org.springframework.core.io.ByteArrayResource(file.getBytes())
+            {
+                @Override
+                public String getFilename() { return file.getOriginalFilename(); }
+            };
+
+            org.springframework.util.LinkedMultiValueMap<String, Object> form = new org.springframework.util.LinkedMultiValueMap<>();
+            form.add("file", fileResource);
+
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.MULTIPART_FORM_DATA);
+            HttpEntity<org.springframework.util.LinkedMultiValueMap<String, Object>> request =
+                new HttpEntity<>(form, headers);
+
+            Map response = restTemplate.postForObject(PYTHON_ALGO + "/predict", request, Map.class);
+            if (response != null && Integer.valueOf(200).equals(response.get("code")))
+            {
+                return success(response.get("data"));
+            }
+            return success(response);
+        }
+        catch (Exception e)
+        {
+            log.error("骨骼分类转发失败", e);
+            return error("骨骼分类服务异常: " + e.getMessage());
+        }
+    }
+
+        @PostMapping("/object-detect")
     public AjaxResult objectDetect()
     {
         try

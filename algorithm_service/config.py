@@ -1,10 +1,10 @@
-import os
+﻿import os
 
 class Settings:
-    # DashScope (ASR + TTS) — 通过环境变量设置
+    # DashScope (ASR + TTS) 鈥?閫氳繃鐜鍙橀噺璁剧疆
     dashscope_api_key: str = os.getenv("DASHSCOPE_API_KEY", "")
     
-    # Qwen (LLM) — 用同一个 Key
+    # Qwen (LLM) 鈥?鐢ㄥ悓涓€涓?Key
     qwen_api_key: str = os.getenv("DASHSCOPE_API_KEY", "")
     qwen_base_url: str = "https://dashscope.aliyuncs.com/compatible-mode/v1"
     qwen_model: str = "qwen3.6-flash"
@@ -22,6 +22,6 @@ class Settings:
     db_port: int = 3306
     db_name: str = "health_data_manager"
     db_user: str = "root"
-    db_pass: str = "775118"
+    db_pass: str = "l123456789"
 
 settings = Settings()

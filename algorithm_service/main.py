@@ -1,4 +1,4 @@
-import logging, os
+﻿import logging, os, traceback
 
 # ====== 在一切导入之前清除系统代理和修复 SSL 证书 ======
 for _key in ["HTTP_PROXY", "HTTPS_PROXY", "http_proxy", "https_proxy"]:
@@ -25,7 +25,7 @@ app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, 
 @app.get("/health")
 def health(): return {"status": "ok", "service": "algorithm-service"}
 
-from chat import chat as chat_sync, chat_stream as chat_stream_gen
+from services.chat import chat as chat_sync, chat_stream as chat_stream_gen
 
 @app.post("/chat")
 async def chat_route(question: str = Form(...), session_id: str = Form(default="")):
@@ -39,28 +39,40 @@ async def chat_stream_route(question: str = Query(...), session_id: str = Query(
         return StreamingResponse(e(), media_type="text/event-stream")
     return StreamingResponse(chat_stream_gen(question.strip(), session_id or None), media_type="text/event-stream")
 
-from asr import recognize
-@app.post("/asr")
-async def asr_route(file: UploadFile = File(...)): return await recognize(file)
-
-from tts import synthesize
-@app.post("/tts")
-async def tts_route(text: str = Form(...)): return await synthesize(text)
-
-from pipeline import pipeline as pipeline_run
-@app.post("/pipeline")
-async def pipeline_route(file: UploadFile = File(...)): return await pipeline_run(file)
-
 @app.post("/classify")
 async def classify_route(file: UploadFile = File(...)):
-    return {"code": 200, "msg": "classify endpoint ready, waiting for model training"}
+    try:
+        from services.classifier import classify
+        image_bytes = await file.read()
+        result = classify(image_bytes, file.filename or "image.jpg")
+        return {
+            "code": 200,
+            "msg": "success",
+            "data": result
+        }
+    except Exception as e:
+        logger.error("Classify error: %s\n%s", e, traceback.format_exc())
+        return {"code": 500, "msg": f"Classify failed: {e}", "data": None}
 
-from detector import run_detection
+from services.detector import run_detection
+from bone_classifier import predict as bone_predict
 
 @app.post("/detect")
 async def detect_route():
     return run_detection()
 
+@app.post("/predict")
+async def predict_route(file: UploadFile = File(...)):
+    contents = await file.read()
+    return bone_predict(contents)
+
+
 if __name__ == "__main__":
     port = int(os.getenv("ALGORITHM_PORT", "5001"))
     uvicorn.run("main:app", host="0.0.0.0", port=port, reload=True)
+
+
+
+
+
+
