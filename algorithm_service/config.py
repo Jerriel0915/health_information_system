@@ -9,7 +9,10 @@ class Settings:
     qwen_base_url: str = "https://dashscope.aliyuncs.com/compatible-mode/v1"
     qwen_model: str = "qwen3.6-flash"
     
-    # ASR
+    # ASR — L1 修复：
+    #   Python 端和 Java 端现在统一使用 paraformer-realtime-v2
+    #   历史：Java 端曾用 paraformer-v2（非流式），后改为 realtime 统一
+    #   精度相当，realtime 版支持短语音流式输入，体验更一致
     asr_model: str = "paraformer-realtime-v2"
     
     # TTS

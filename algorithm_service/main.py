@@ -39,6 +39,16 @@ async def chat_stream_route(question: str = Query(...), session_id: str = Query(
         return StreamingResponse(e(), media_type="text/event-stream")
     return StreamingResponse(chat_stream_gen(question.strip(), session_id or None), media_type="text/event-stream")
 
+# ====== TTS 文本到语音（Phase 4：对 Java 端透传模式开放） ======
+from services.tts import synthesize as tts_synthesize
+
+@app.post("/tts")
+async def tts_route(text: str = Form(...)):
+    """文本合成语音。Java AlgorithmController 在 tts.mode=python 时会调此端点。"""
+    if not text or not text.strip():
+        return Response(content=b"text is empty", status_code=400)
+    return await tts_synthesize(text.strip())
+
 @app.post("/classify")
 async def classify_route(file: UploadFile = File(...)):
     try:

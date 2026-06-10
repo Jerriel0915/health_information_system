@@ -8,6 +8,8 @@ import com.ruoyi.system.service.AsrService;
 import com.ruoyi.system.service.ChatSessionService;
 import com.ruoyi.system.service.TtsService;
 import com.ruoyi.common.annotation.Anonymous;
+import com.ruoyi.system.service.IReportService;
+import jakarta.annotation.PreDestroy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.*;
@@ -40,21 +42,67 @@ import java.util.concurrent.Executors;
 public class AlgorithmController extends BaseController
 {
     private static final Logger log = LoggerFactory.getLogger(AlgorithmController.class);
-    private static final String PYTHON_ALGO = "http://localhost:5001";
-    private static final ExecutorService sseExecutor = Executors.newCachedThreadPool();
+    private static final String DEFAULT_PYTHON_ALGO = "http://localhost:5001";
+
+    /**
+     * M6 修复：SSE 流式对话专用线程池。改实例字段 + @PreDestroy 关闭。
+     */
+    private final ExecutorService sseExecutor = Executors.newCachedThreadPool();
 
     private final RestTemplate restTemplate;
     private final ChatSessionService chatSessionService;
     private final AsrService asrService;
     private final TtsService ttsService;
+    private final IReportService reportService;
+    private final com.ruoyi.common.config.AlgorithmConfig algorithmConfig;
 
     public AlgorithmController(RestTemplate restTemplate, ChatSessionService chatSessionService,
-                               AsrService asrService, TtsService ttsService)
+                               AsrService asrService, TtsService ttsService, IReportService reportService,
+                               com.ruoyi.common.config.AlgorithmConfig algorithmConfig)
     {
         this.restTemplate = restTemplate;
         this.chatSessionService = chatSessionService;
         this.asrService = asrService;
         this.ttsService = ttsService;
+        this.reportService = reportService;
+        this.algorithmConfig = algorithmConfig;
+    }
+
+    private String pythonBaseUrl()
+    {
+        String url = algorithmConfig != null ? algorithmConfig.getPythonBaseUrl() : null;
+        return (url == null || url.isEmpty()) ? DEFAULT_PYTHON_ALGO : url;
+    }
+
+    /**
+     * M3 修复：判断是否走 Python 透传模式。空值安全。
+     */
+    private boolean isPythonMode()
+    {
+        String mode = algorithmConfig.getTtsMode();
+        return "python".equalsIgnoreCase(mode);
+    }
+
+    /**
+     * M6 修复：Spring 关闭时优雅停止 SSE 线程池。
+     */
+    @PreDestroy
+    public void destroy()
+    {
+        sseExecutor.shutdown();
+        try
+        {
+            if (!sseExecutor.awaitTermination(5, java.util.concurrent.TimeUnit.SECONDS))
+            {
+                sseExecutor.shutdownNow();
+            }
+        }
+        catch (InterruptedException e)
+        {
+            sseExecutor.shutdownNow();
+            Thread.currentThread().interrupt();
+        }
+        log.info("SSE 线程池已关闭");
     }
 
     // ==================== 会话管理（Java 本地） ====================
@@ -111,7 +159,7 @@ public class AlgorithmController extends BaseController
         }
     }
 
-    // ==================== TTS（Java 本地处理） ====================
+    // ==================== TTS（Java 本地处理 / Python 透传） ====================
 
     @PostMapping("/tts")
     public ResponseEntity<byte[]> tts(@RequestBody Map<String, String> body)
@@ -121,6 +169,13 @@ public class AlgorithmController extends BaseController
         {
             return ResponseEntity.badRequest().body("文本不能为空".getBytes(StandardCharsets.UTF_8));
         }
+
+        // Phase 4: mode=python 时透传到 Python 算法服务
+        if (isPythonMode())
+        {
+            return forwardTtsToPython(text);
+        }
+
         try
         {
             byte[] audioData = ttsService.synthesize(text.trim());
@@ -132,12 +187,143 @@ public class AlgorithmController extends BaseController
 
             return new ResponseEntity<>(audioData, headers, HttpStatus.OK);
         }
+        catch (TtsService.TtsException e)
+        {
+            return mapTtsException(e, "语音合成失败");
+        }
         catch (Exception e)
         {
             log.error("TTS 合成失败", e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(("语音合成失败: " + e.getMessage()).getBytes(StandardCharsets.UTF_8));
         }
+    }
+
+    /**
+     * 透传 TTS 请求到 Python 算法服务（Phase 4）
+     */
+    private ResponseEntity<byte[]> forwardTtsToPython(String text)
+    {
+        try
+        {
+            org.springframework.util.LinkedMultiValueMap<String, String> form = new org.springframework.util.LinkedMultiValueMap<>();
+            form.add("text", text);
+
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.MULTIPART_FORM_DATA);
+            HttpEntity<org.springframework.util.LinkedMultiValueMap<String, String>> request =
+                    new HttpEntity<>(form, headers);
+
+            ResponseEntity<byte[]> response = restTemplate.postForEntity(
+                    pythonBaseUrl() + "/tts", request, byte[].class);
+
+            HttpHeaders respHeaders = new HttpHeaders();
+            respHeaders.setContentType(MediaType.parseMediaType("audio/wav"));
+            if (response.getBody() != null) respHeaders.setContentLength(response.getBody().length);
+            respHeaders.set("X-Tts-Mode", "python");
+            return new ResponseEntity<>(response.getBody(), respHeaders,
+                    response.getStatusCode().is2xxSuccessful() ? HttpStatus.OK : response.getStatusCode());
+        }
+        catch (Exception e)
+        {
+            log.error("Python TTS 透传失败", e);
+            return ResponseEntity.status(HttpStatus.BAD_GATEWAY)
+                    .body(("Python TTS 服务不可用: " + e.getMessage()).getBytes(StandardCharsets.UTF_8));
+        }
+    }
+
+    /**
+     * 把 TtsException 映射为 HTTP 状态码（Phase 3）
+     */
+    private ResponseEntity<byte[]> mapTtsException(TtsService.TtsException e, String prefix)
+    {
+        HttpStatus status;
+        String userMsg;
+        switch (e.getError())
+        {
+            case EMPTY_TEXT:
+                status = HttpStatus.BAD_REQUEST;
+                userMsg = "文本不能为空";
+                break;
+            case NOT_CONFIGURED:
+                status = HttpStatus.SERVICE_UNAVAILABLE;
+                userMsg = "AI 服务未配置 API Key";
+                break;
+            case TIMEOUT:
+                status = HttpStatus.GATEWAY_TIMEOUT;
+                userMsg = "语音合成超时，请稍后重试";
+                break;
+            case INTERRUPTED:
+                status = HttpStatus.SERVICE_UNAVAILABLE;
+                userMsg = "语音合成被中断";
+                break;
+            case UPSTREAM_ERROR:
+            default:
+                status = HttpStatus.BAD_GATEWAY;
+                userMsg = "上游语音服务异常";
+                break;
+        }
+        log.warn("{} err={} msg={}", prefix, e.getError(), e.getMessage());
+        return ResponseEntity.status(status)
+                .body((prefix + ": " + userMsg).getBytes(StandardCharsets.UTF_8));
+    }
+
+    /**
+     * 统计报告 TTS — 服务端组装真实朗读文本，再合成音频
+     *
+     * <p>使用方式：先调 {@code GET /algorithm/tts/report/text?type=bed} 预览文本，
+     * 再调本端点获取音频。这样可避免在 HTTP 响应头中携带大文本（修复 H1 超长头）。
+     *
+     * @param body { "type": "bed|cost|service|..." }
+     * @return 音频 wav 二进制
+     */
+    @PostMapping("/tts/report")
+    public ResponseEntity<byte[]> ttsReport(@RequestBody Map<String, Object> body)
+    {
+        String type = body != null && body.get("type") != null ? body.get("type").toString() : "dashboard";
+
+        String text = reportService.generateText(type);
+        if (text == null || text.trim().isEmpty())
+        {
+            return ResponseEntity.badRequest().body("报告内容为空".getBytes(StandardCharsets.UTF_8));
+        }
+
+        // Phase 4: mode=python 时走 Python 服务
+        if (isPythonMode())
+        {
+            return forwardTtsToPython(text);
+        }
+
+        try
+        {
+            byte[] audioData = ttsService.synthesize(text.trim());
+
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.parseMediaType("audio/wav"));
+            headers.setContentLength(audioData.length);
+            headers.set("Content-Disposition", "inline; filename=\"report_" + type + ".wav\"");
+            headers.set("X-Report-Type", type);
+            return new ResponseEntity<>(audioData, headers, HttpStatus.OK);
+        }
+        catch (TtsService.TtsException e)
+        {
+            return mapTtsException(e, "报告语音合成失败");
+        }
+        catch (Exception e)
+        {
+            log.error("报告 TTS 合成失败 type={}", type, e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(("报告语音合成失败: " + e.getMessage()).getBytes(StandardCharsets.UTF_8));
+        }
+    }
+
+    /**
+     * 报告文本预览 — 不合成音频，只返回朗读文本
+     */
+    @GetMapping("/tts/report/text")
+    public AjaxResult ttsReportText(@RequestParam(name = "type", defaultValue = "dashboard") String type)
+    {
+        return success(reportService.generateReport(type));
     }
 
     // ==================== Pipeline（转发到 Python 算法服务） ====================
@@ -162,7 +348,7 @@ public class AlgorithmController extends BaseController
                     new HttpEntity<>(form, headers);
 
             ResponseEntity<byte[]> response = restTemplate.postForEntity(
-                    PYTHON_ALGO + "/pipeline", request, byte[].class);
+                    pythonBaseUrl() + "/pipeline", request, byte[].class);
 
             HttpHeaders respHeaders = new HttpHeaders();
             respHeaders.setContentType(MediaType.parseMediaType("audio/wav"));
@@ -216,7 +402,7 @@ public class AlgorithmController extends BaseController
         sseExecutor.execute(() -> {
             try
             {
-                String url = PYTHON_ALGO + "/chat/stream?question="
+                String url = pythonBaseUrl() + "/chat/stream?question="
                         + URLEncoder.encode(question, "UTF-8")
                         + "&session_id=" + URLEncoder.encode(sessionId, "UTF-8");
 
@@ -303,7 +489,7 @@ public class AlgorithmController extends BaseController
             HttpEntity<org.springframework.util.LinkedMultiValueMap<String, String>> request =
                     new HttpEntity<>(form, headers);
 
-            Map response = restTemplate.postForObject(PYTHON_ALGO + "/chat", request, Map.class);
+            Map response = restTemplate.postForObject(pythonBaseUrl() + "/chat", request, Map.class);
             String answer = "";
             if (response != null && Integer.valueOf(200).equals(response.get("code")))
             {
@@ -348,7 +534,7 @@ public class AlgorithmController extends BaseController
             HttpEntity<org.springframework.util.LinkedMultiValueMap<String, Object>> request =
                     new HttpEntity<>(form, headers);
 
-            Map response = restTemplate.postForObject(PYTHON_ALGO + "/classify", request, Map.class);
+            Map response = restTemplate.postForObject(pythonBaseUrl() + "/classify", request, Map.class);
             if (response != null && Integer.valueOf(200).equals(response.get("code")))
             {
                 return success(response.get("data"));
@@ -381,7 +567,7 @@ public class AlgorithmController extends BaseController
             HttpEntity<org.springframework.util.LinkedMultiValueMap<String, Object>> request =
                 new HttpEntity<>(form, headers);
 
-            Map response = restTemplate.postForObject(PYTHON_ALGO + "/predict", request, Map.class);
+            Map response = restTemplate.postForObject(pythonBaseUrl() + "/predict", request, Map.class);
             if (response != null && Integer.valueOf(200).equals(response.get("code")))
             {
                 return success(response.get("data"));
@@ -400,7 +586,7 @@ public class AlgorithmController extends BaseController
     {
         try
         {
-            Map response = restTemplate.postForObject(PYTHON_ALGO + "/detect", null, Map.class);
+            Map response = restTemplate.postForObject(pythonBaseUrl() + "/detect", null, Map.class);
             if (response != null && Integer.valueOf(200).equals(response.get("code")))
             {
                 return success(response.get("data"));

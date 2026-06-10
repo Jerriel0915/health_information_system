@@ -96,6 +96,25 @@ export function textToSpeech(text) {
     })
 }
 
+// ==================== 统计报告 TTS ====================
+// 一步完成"取数据 → 组装文本 → 合成音频"
+export function ttsReport(type) {
+    return request({
+        url: '/algorithm/tts/report',
+        method: 'post',
+        data: { type },
+        responseType: 'blob'
+    })
+}
+
+// 仅获取报告文本（用于预览，不合成）
+export function getReportText(type) {
+    return request({
+        url: `/algorithm/tts/report/text?type=${encodeURIComponent(type)}`,
+        method: 'get'
+    })
+}
+
 // ==================== 图像分类 ====================
 export function imageClassify(file) {
     const formData = new FormData()

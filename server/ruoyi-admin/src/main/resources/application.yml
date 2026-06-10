@@ -141,8 +141,8 @@ referer:
 xss:
   # 过滤开关
   enabled: true
-  # 排除链接（多个用逗号分隔）
-  excludes: /system/notice,/algorithm
+  # 排除链接（多个用逗号分隔）— /system/report 加入排除，避免报告接口的纯文本被过滤
+  excludes: /system/notice,/algorithm,/system/report
   # 匹配链接
   urlPatterns: /system/*,/monitor/*,/tool/*
 
@@ -155,7 +155,10 @@ algorithm:
   deepseek-model: deepseek-chat
   # 阿里云 DashScope 配置
   dashscope-api-key: ''
-  asr-model: paraformer-v2
+  asr-model: paraformer-realtime-v2
   tts-model: sambert-zhiyuan-v1
   tts-sample-rate: 48000
   tts-format: wav
+  # TTS 模式：java（默认，本地 SDK）或 python（透传到 Python 算法服务 :5001）
+  tts-mode: java
+  python-base-url: http://localhost:5001

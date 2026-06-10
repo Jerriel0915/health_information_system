@@ -177,7 +177,7 @@
 import { ref, nextTick, onMounted, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { Cpu, ChatDotRound, User, Microphone, Close, Headset, Picture, UploadFilled, Warning, FolderOpened, Document, Plus, Delete, Tools } from '@element-plus/icons-vue'
-import { sendChatMessage, sendChatMessageStream, speechToText, textToSpeech, getSessionList, createSession, deleteSession, getChatHistory, boneClassify, imageClassify, runAnomalyDetection } from '@/api/ai'
+import { sendChatMessage, sendChatMessageStream, speechToText, textToSpeech, getSessionList, createSession, deleteSession, getChatHistory, boneClassify, imageClassify, runAnomalyDetection, ttsReport, getReportText } from '@/api/ai'
 
 const activeTab = ref('chat')
 const chatMessages = ref([{ role: 'assistant', content: '你好！我是数据分析助手，可以帮你查询床位、费用、服务量等数据。', time: new Date().toLocaleTimeString() }])
@@ -194,7 +194,20 @@ const asrQueryLoading = ref(false)
 const uploadFileName = ref('')
 const ttsReportType = ref('bed')
 const ttsReportContent = ref('')
+const ttsReportLoading = ref(false)
 const ttsSpeaking = ref(false)
+// Phase 2: 跟踪当前播放的 Audio 实例，stopSpeak 才能真正中断
+let currentAudio = null
+const stopCurrentAudio = () => {
+    if (currentAudio) {
+        try {
+            currentAudio.pause()
+            currentAudio.currentTime = 0
+        } catch (e) { /* ignore */ }
+        if (currentAudio._objectUrl) URL.revokeObjectURL(currentAudio._objectUrl)
+        currentAudio = null
+    }
+}
 const uploadedImage = ref(null)
 // 医疗设备中英文映射
 const categoryMap = {
@@ -423,43 +436,69 @@ const handleFileUpload = (file) => {
 const speakAsrResult = async () => {
   if (!asrQueryResult.value) { ElMessage.warning('没有可播报的内容'); return }
   asrSpeaking.value = true
+  stopCurrentAudio()
   try {
     const res = await textToSpeech(asrQueryResult.value)
     if (res instanceof Blob) {
-      const url = URL.createObjectURL(res); const audio = new Audio(url)
-      audio.onended = () => { asrSpeaking.value = false; URL.revokeObjectURL(url) }
-      audio.onerror = () => { asrSpeaking.value = false; URL.revokeObjectURL(url); ElMessage.error('播放失败') }
-      audio.play()
+      playBlobAudio(res, () => { asrSpeaking.value = false }, () => { asrSpeaking.value = false; ElMessage.error('播放失败') })
     } else { ElMessage.error('语音合成失败'); asrSpeaking.value = false }
   } catch (e) { ElMessage.error('语音合成服务连接失败'); asrSpeaking.value = false }
 }
 
-const stopAsrSpeak = () => { window.speechSynthesis?.cancel(); asrSpeaking.value = false }
+const stopAsrSpeak = () => { stopCurrentAudio(); asrSpeaking.value = false }
 
-const generateReportContent = () => {
-  const now = new Date(); const ds = now.toLocaleDateString('zh-CN')
-  switch (ttsReportType.value) {
-    case 'bed': ttsReportContent.value = '【' + ds + ' 床位统计报告】\n全市医疗卫生机构床位总数 1655 张，其中公立医院 1200 张，基层医疗机构 455 张。\n床位使用率 78.5%，较上月提升 2.3 个百分点。\n建议：加强基层医疗资源配置，适当增加康复护理床位。'; break
-    case 'cost': ttsReportContent.value = '【' + ds + ' 费用统计报告】\n本周期医疗费用总额约 4253 万元，门诊次均费用 285 元，住院次均费用 6280 元。\n医保基金支出占比 65.2%，个人自付比例 22.8%。\n建议：关注药品费用增长趋势，优化控费措施。'; break
-    case 'service': ttsReportContent.value = '【' + ds + ' 服务量统计报告】\n本周期医疗卫生服务总量约 50000 人次，其中门诊服务 38000 人次，住院服务 12000 人次。\n基层首诊比例 42.3%，同比增长 5.1 个百分点。\n建议：持续推进分级诊疗制度，提升基层服务能力。'; break
+const generateReportContent = async () => {
+  // Phase 1: 从后端拉取真实数据拼装的报告文本
+  ttsReportLoading.value = true
+  ttsReportContent.value = '正在加载报告...'
+  try {
+    const res = await getReportText(ttsReportType.value)
+    if (res.code === 200 && res.data) {
+      ttsReportContent.value = res.data.text || ''
+    } else {
+      ttsReportContent.value = ''
+      ElMessage.error(res.msg || '报告加载失败')
+    }
+  } catch (e) {
+    ttsReportContent.value = ''
+    ElMessage.error('报告服务连接失败: ' + (e.message || '未知错误'))
+  } finally {
+    ttsReportLoading.value = false
   }
 }
 
 const speakReport = async () => {
-  if (!ttsReportContent.value) { ElMessage.warning('请先生成报告内容'); return }
+  if (!ttsReportContent.value || ttsReportContent.value === '正在加载报告...') {
+    ElMessage.warning('请先生成报告内容'); return
+  }
   ttsSpeaking.value = true
+  stopCurrentAudio()
+  // Phase 1: 走 /algorithm/tts/report，服务端拼装真实数据
   try {
-    const res = await textToSpeech(ttsReportContent.value)
-    if (res instanceof Blob) {
-      const url = URL.createObjectURL(res); const audio = new Audio(url)
-      audio.onended = () => { ttsSpeaking.value = false; URL.revokeObjectURL(url) }
-      audio.onerror = () => { ttsSpeaking.value = false; URL.revokeObjectURL(url); ElMessage.error('播放失败') }
-      audio.play()
+    const blob = await ttsReport(ttsReportType.value)
+    if (blob instanceof Blob) {
+      playBlobAudio(blob,
+        () => { ttsSpeaking.value = false },
+        () => { ttsSpeaking.value = false; ElMessage.error('播放失败') })
     } else { ElMessage.error('语音合成失败'); ttsSpeaking.value = false }
-  } catch (e) { ElMessage.error('语音合成服务连接失败'); ttsSpeaking.value = false }
+  } catch (e) {
+    ElMessage.error('语音合成服务连接失败: ' + (e.message || '未知错误'))
+    ttsSpeaking.value = false
+  }
 }
 
-const stopSpeak = () => { window.speechSynthesis?.cancel(); ttsSpeaking.value = false }
+const stopSpeak = () => { stopCurrentAudio(); ttsSpeaking.value = false }
+
+// Phase 2: 统一的 blob 音频播放函数
+const playBlobAudio = (blob, onEnded, onError) => {
+  const url = URL.createObjectURL(blob)
+  const audio = new Audio(url)
+  audio._objectUrl = url
+  audio.onended = () => { URL.revokeObjectURL(url); if (currentAudio === audio) currentAudio = null; onEnded && onEnded() }
+  audio.onerror = () => { URL.revokeObjectURL(url); if (currentAudio === audio) currentAudio = null; onError && onError() }
+  currentAudio = audio
+  audio.play().catch(e => { onError && onError(e) })
+}
 
 const handleImageUpload = async (file) => {
   uploadedImage.value = URL.createObjectURL(file)
@@ -528,7 +567,7 @@ const viewDetail = (row) => { ElMessage.info('异常检测功能待后续更新'
 onMounted(async () => {
   await loadSessions()
   if (sessionList.value.length > 0) await switchSession(sessionList.value[sessionList.value.length - 1].id)
-  generateReportContent()
+  await generateReportContent()
 })
 </script>
 
