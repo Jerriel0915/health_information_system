@@ -22,8 +22,8 @@ public class AlgorithmConfig
     /** 阿里云 DashScope API Key */
     private String dashscopeApiKey = "";
 
-    /** 阿里云 ASR 模型 */
-    private String asrModel = "paraformer-v2";
+    /** 阿里云 ASR 模型（与 application.yml 默认值保持一致，避免配置漂移） */
+    private String asrModel = "paraformer-realtime-v2";
 
     /** 阿里云 TTS 模型 */
     private String ttsModel = "sambert-zhiyuan-v1";
@@ -33,6 +33,17 @@ public class AlgorithmConfig
 
     /** TTS 音频格式 */
     private String ttsFormat = "wav";
+
+    /**
+     * TTS 模式：java（默认，本地 SDK）或 python（透传到 Python 算法服务）
+     * 设置为 python 时，/algorithm/tts 与 /algorithm/tts/report 走 :5001
+     */
+    private String ttsMode = "java";
+
+    /**
+     * Python 算法服务 baseURL（用于 tts.mode=python 透传）
+     */
+    private String pythonBaseUrl = "http://localhost:5001";
 
     public String getDeepseekApiKey() {
         if (deepseekApiKey != null && !deepseekApiKey.isEmpty()) return deepseekApiKey;
@@ -67,4 +78,10 @@ public class AlgorithmConfig
 
     public String getTtsFormat() { return ttsFormat; }
     public void setTtsFormat(String ttsFormat) { this.ttsFormat = ttsFormat; }
+
+    public String getTtsMode() { return ttsMode; }
+    public void setTtsMode(String ttsMode) { this.ttsMode = ttsMode; }
+
+    public String getPythonBaseUrl() { return pythonBaseUrl; }
+    public void setPythonBaseUrl(String pythonBaseUrl) { this.pythonBaseUrl = pythonBaseUrl; }
 }
