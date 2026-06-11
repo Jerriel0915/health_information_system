@@ -1,37 +1,85 @@
-﻿<template>
+<template>
   <div class="page-container">
     <div class="ai-header">
       <h2><el-icon><Cpu /></el-icon> 智能分析中心</h2>
       <p class="subtitle">集成对话大模型、语音交互、图像识别、异常检测等AI能力</p>
     </div>
     <el-tabs v-model="activeTab" type="border-card">
-      <el-tab-pane name="chat">
-        <template #label><span><el-icon><ChatDotRound /></el-icon> 数据分析助手</span></template>
-        <div class="chat-layout">
-          <div class="chat-sidebar">
-            <div class="sidebar-header"><span>会话列表</span><el-button type="primary" size="small" @click="handleNewSession" circle><el-icon><Plus /></el-icon></el-button></div>
-            <div class="session-list" v-if="sessionList.length">
-              <div v-for="s in sessionList" :key="s.id" :class="['session-item', { active: s.id === currentSessionId }]" @click="switchSession(s.id)">
-                <div class="session-title">{{ s.title }}</div>
-                <div class="session-time">{{ s.updatedAt ? new Date(s.updatedAt).toLocaleString() : '' }}</div>
-                <el-button link type="danger" size="small" class="session-del" @click.stop="handleDeleteSession(s.id)"><el-icon><Delete /></el-icon></el-button>
+      <el-tab-pane name="pneumonia">
+        <template #label>
+          <span><el-icon><Picture /></el-icon> 肺炎分类</span>
+        </template>
+        <div class="pneumonia-container">
+          <el-card class="pneumonia-card">
+            <template #header>
+              <div class="card-header">
+                <span>🫁 肺炎X光图像分类</span>
+                <el-tag type="info" size="small">AI 智能分析</el-tag>
+              </div>
+            </template>
+
+            <!-- 上传区域 -->
+            <el-upload
+                class="pneumonia-upload"
+                drag
+                action="#"
+                :before-upload="handlePneumoniaUpload"
+                accept="image/jpeg,image/png"
+                :show-file-list="false"
+            >
+              <el-icon class="el-icon--upload"><UploadFilled /></el-icon>
+              <div class="el-upload__text">
+                拖拽X光图片到此处 或 <em>点击上传</em>
+              </div>
+              <template #tip>
+                <div class="el-upload__tip">
+                  支持 jpg / png 格式，单张图片不超过 10MB
+                </div>
+              </template>
+            </el-upload>
+
+            <!-- 图片预览 -->
+            <div v-if="pneumoniaPreviewUrl" class="pneumonia-preview">
+              <div class="preview-title">当前X光片：</div>
+              <div class="preview-img">
+                <el-image :src="pneumoniaPreviewUrl" fit="contain" :preview-src-list="[pneumoniaPreviewUrl]" />
               </div>
             </div>
-            <div v-else class="sidebar-empty">暂无会话</div>
-          </div>
-          <div class="chat-main">
-            <div class="chat-messages" ref="chatMessagesRef">
-              <div v-for="(msg, idx) in chatMessages" :key="idx" :class="['message', msg.role]">
-                <div class="message-avatar"><el-icon><User v-if="msg.role === 'user'" /><Cpu v-else /></el-icon></div>
-                <div class="message-content"><div class="message-text">{{ msg.content }}</div><div class="message-time">{{ msg.time }}</div></div>
+
+            <!-- 分析结果 -->
+            <div v-if="pneumoniaResult" class="pneumonia-result">
+              <el-divider />
+              <div class="result-header">
+                <span>📊 分析结果</span>
               </div>
-              <div v-if="chatLoading" class="message assistant"><div class="message-avatar"><el-icon><Cpu /></el-icon></div><div class="message-content"><div class="typing-indicator"><span></span><span></span><span></span></div></div></div>
+              <div class="result-content">
+                <div class="result-item">
+                  <span class="label">诊断结果：</span>
+                  <el-tag :type="pneumoniaResult.result === '肺炎' ? 'danger' : 'success'" size="large">
+                    {{ pneumoniaResult.result === '肺炎' ? '肺炎阳性' : '肺炎阴性' }}
+                  </el-tag>
+                </div>
+                <div class="result-item">
+                  <span class="label">置信度：</span>
+                  <el-progress
+                      :percentage="Math.round(pneumoniaResult.confidence * 100)"
+                      :color="pneumoniaResult.result === '肺炎' ? '#f56c6c' : '#67c23a'"
+                      :format="() => (pneumoniaResult.confidence * 100).toFixed(2) + '%'"
+                  />
+                </div>
+                <div class="result-item" v-if="pneumoniaResult.class_id !== undefined">
+                  <span class="label">类别ID：</span>
+                  <span>{{ pneumoniaResult.class_id }}（{{ pneumoniaResult.class_id === 0 ? '正常' : '肺炎' }}）</span>
+                </div>
+              </div>
             </div>
-            <div class="chat-input-area">
-              <el-input v-model="chatInput" type="textarea" :rows="3" placeholder="输入问题，例如：今年床位使用率趋势如何？" @keyup.ctrl.enter="sendChat" />
-              <div class="chat-actions"><el-button type="primary" @click="sendChat" :loading="chatLoading">发送 (Ctrl+Enter)</el-button><el-button @click="clearChat">清空对话</el-button></div>
+
+            <!-- 加载中 -->
+            <div v-if="pneumoniaLoading" class="pneumonia-loading">
+              <el-icon class="is-loading"><Loading /></el-icon>
+              <span>AI 模型正在分析中，请稍后...</span>
             </div>
-          </div>
+          </el-card>
         </div>
       </el-tab-pane>
             <el-tab-pane name="asr">
@@ -104,49 +152,10 @@
         </div>
       </el-tab-pane>
       <el-tab-pane name="image">
-        <template #label><span><el-icon><Picture /></el-icon> 医疗器械分类测试</span></template>
+        <template #label><span><el-icon><Picture /></el-icon> 图像分类</span></template>
         <div class="image-container"><el-row :gutter="24">
           <el-col :span="12"><div class="image-card"><div class="image-title">上传医疗图像</div><el-upload action="#" :before-upload="handleImageUpload" accept="image/*" :show-file-list="false" drag><el-icon><UploadFilled /></el-icon><div class="el-upload__text">将图像拖到此处，或<em>点击上传</em></div></el-upload><div v-if="uploadedImage" class="image-preview"><img :src="uploadedImage"><el-button type="danger" size="small" circle @click="clearImage" class="clear-btn"><el-icon><Close /></el-icon></el-button></div></div></el-col>
-          <el-col :span="12"><div class="image-card"><div class="image-title">分类结果</div>
-            <div v-if="imageClassifying" v-loading="imageClassifying" class="result-loading">正在分析图像...</div>
-            <div v-else-if="imageResult" class="image-result">
-              <div class="result-header">
-                <el-tag type="success" size="large" effect="dark" class="result-tag">{{ categoryMap[imageResult.category] || imageResult.category }}</el-tag>
-                <span class="result-conf">{{ imageResult.confidence }}%</span>
-              </div>
-              <div class="result-desc">{{ imageResult.description }}</div>
-              <div class="ranking-title">置信度排名</div>
-              <div class="ranking-list">
-                <div v-for="(item, idx) in imageResult.ranking" :key="idx" class="ranking-item" :class="{ active: item.category === imageResult.category }">
-                  <span class="ranking-index">{{ idx + 1 }}</span>
-                  <span class="ranking-name">{{ categoryMap[item.category] || item.category }}</span>
-                  <el-progress :percentage="item.confidence" :show-text="false" :stroke-width="6" />
-                  <span class="ranking-conf">{{ item.confidence }}%</span>
-                </div>
-              </div>
-            </div>
-            <el-empty v-else description="等待上传图像" />
-          </div></el-col>
-        </el-row></div>
-      </el-tab-pane>
-            <!-- 肺炎X光分类测试 -->
-      <el-tab-pane name="bone">
-        <template #label><span><el-icon><Tools /></el-icon> 肺炎X光分类测试</span></template>
-        <div class="image-container"><el-row :gutter="24">
-          <el-col :span="12"><div class="image-card"><div class="image-title">上传肺部X光图像</div><el-upload action="#" :before-upload="handleBoneUpload" accept="image/*" :show-file-list="false" drag><el-icon><UploadFilled /></el-icon><div class="el-upload__text">将肺部X光图像拖到此处，或<em>点击上传</em></div></el-upload><div v-if="boneUploadedImage" class="image-preview"><img :src="boneUploadedImage"><el-button type="danger" size="small" circle @click="clearBoneImage" class="clear-btn"><el-icon><Close /></el-icon></el-button></div></div></el-col>
-          <el-col :span="12"><div class="image-card"><div class="image-title">分类结果</div>
-            <div v-if="boneClassifying" v-loading="boneClassifying" class="result-loading">正在分析肺部图像...</div>
-            <div v-else-if="boneResult" class="image-result">
-              <div class="result-header">
-                <el-tag :type="boneResult.class_name === '正常' ? 'success' : 'danger'" size="large" effect="dark" class="result-tag">{{ boneResult.class_name }}</el-tag>
-                <span class="result-conf">{{ (boneResult.confidence * 100).toFixed(1) }}%</span>
-              </div>
-              <div style="text-align:center;padding:10px 0;color:#606266;font-size:14px;">
-                {{ boneResult.class_name === '正常' ? '肺部结构未见明显异常' : '检测到肺炎特征，建议进一步检查' }}
-              </div>
-            </div>
-            <el-empty v-else description="等待上传肺部X光图像" />
-          </div></el-col>
+          <el-col :span="12"><div class="image-card"><div class="image-title">分类结果</div><div v-if="imageClassifying" v-loading="imageClassifying" class="result-loading">正在分析图像...</div><div v-else-if="imageResult" class="image-result"><div><span class="label">类别：</span><el-tag type="primary">{{ imageResult.category }}</el-tag></div><div><span class="label">置信度：</span><el-progress :percentage="imageResult.confidence" /></div><div><span class="label">描述：</span><p>{{ imageResult.description }}</p></div></div><el-empty v-else description="等待上传图像" /></div></el-col>
         </el-row></div>
       </el-tab-pane>
       <el-tab-pane name="detection">
@@ -169,16 +178,94 @@
           </el-table>
         </div>
       </el-tab-pane>
+      <el-tab-pane name="bone">
+        <template #label>
+          <span><el-icon><Picture /></el-icon> 肺炎分类</span>
+        </template>
+        <div class="bone-container">
+          <el-card class="bone-card">
+            <template #header>
+              <div class="card-header">
+                <span>🫁 肺炎X光图像分类</span>
+                <el-tag type="info" size="small">AI 智能分析</el-tag>
+              </div>
+            </template>
+
+            <!-- 上传区域 -->
+            <el-upload
+                class="bone-upload"
+                drag
+                action="#"
+                :before-upload="handleBoneUpload"
+                accept="image/jpeg,image/png"
+                :show-file-list="false"
+            >
+              <el-icon class="el-icon--upload"><UploadFilled /></el-icon>
+              <div class="el-upload__text">
+                拖拽图片到此处 或 <em>点击上传</em>
+              </div>
+              <template #tip>
+                <div class="el-upload__tip">
+                  支持 jpg / png 格式，单张图片不超过 10MB
+                </div>
+              </template>
+            </el-upload>
+
+            <!-- 图片预览 -->
+            <div v-if="bonePreviewUrl" class="bone-preview">
+              <div class="preview-title">当前图片：</div>
+              <div class="preview-img">
+                <el-image :src="bonePreviewUrl" fit="contain" :preview-src-list="[bonePreviewUrl]" />
+              </div>
+            </div>
+
+            <!-- 分析结果 -->
+            <div v-if="boneResult" class="bone-result">
+              <el-divider />
+              <div class="result-header">
+                <span>📊 分析结果</span>
+              </div>
+              <div class="result-content">
+                <div class="result-item">
+                  <span class="label">分类结果：</span>
+                  <el-tag :type="boneResult.result === '异常' ? 'danger' : 'success'" size="large">
+                    {{ boneResult.result }}
+                  </el-tag>
+                </div>
+                <div class="result-item">
+                  <span class="label">置信度：</span>
+                  <el-progress
+                      :percentage="Math.round(boneResult.confidence * 100)"
+                      :color="boneResult.result === '异常' ? '#f56c6c' : '#67c23a'"
+                      :format="() => (boneResult.confidence * 100).toFixed(2) + '%'"
+                  />
+                </div>
+                <div class="result-item" v-if="boneResult.class_id !== undefined">
+                  <span class="label">类别ID：</span>
+                  <span>{{ boneResult.class_id }}（{{ boneResult.class_id === 0 ? '正常' : '异常' }}）</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- 加载中 -->
+            <div v-if="boneLoading" class="bone-loading">
+              <el-icon class="is-loading"><Loading /></el-icon>
+              <span>AI 模型正在分析中，请稍后...</span>
+            </div>
+          </el-card>
+        </div>
+      </el-tab-pane>
     </el-tabs>
   </div>
 </template>
 
-<script setup>
-import { ref, nextTick, onMounted, watch } from 'vue'
-import { ElMessage } from 'element-plus'
-import { Cpu, ChatDotRound, User, Microphone, Close, Headset, Picture, UploadFilled, Warning, FolderOpened, Document, Plus, Delete, Tools } from '@element-plus/icons-vue'
-import { sendChatMessage, sendChatMessageStream, speechToText, textToSpeech, getSessionList, createSession, deleteSession, getChatHistory, boneClassify, imageClassify, runAnomalyDetection, ttsReport, getReportText } from '@/api/ai'
-
+  <script setup>
+  import { ref, nextTick, onMounted, watch } from 'vue'
+  import { ElMessage } from 'element-plus'
+  import { Cpu, ChatDotRound, User, Microphone, Close, Headset, Picture, UploadFilled, Warning, FolderOpened, Document, Plus, Delete, Loading } from '@element-plus/icons-vue'
+  import { sendChatMessage, speechToText, textToSpeech, getSessionList, createSession, deleteSession, getChatHistory } from '@/api/ai'
+  import axios from 'axios'
+  import { getToken } from '@/utils/auth'
 const activeTab = ref('chat')
 const chatMessages = ref([{ role: 'assistant', content: '你好！我是数据分析助手，可以帮你查询床位、费用、服务量等数据。', time: new Date().toLocaleTimeString() }])
 const chatInput = ref('')
@@ -194,34 +281,8 @@ const asrQueryLoading = ref(false)
 const uploadFileName = ref('')
 const ttsReportType = ref('bed')
 const ttsReportContent = ref('')
-const ttsReportLoading = ref(false)
 const ttsSpeaking = ref(false)
-// Phase 2: 跟踪当前播放的 Audio 实例，stopSpeak 才能真正中断
-let currentAudio = null
-const stopCurrentAudio = () => {
-    if (currentAudio) {
-        try {
-            currentAudio.pause()
-            currentAudio.currentTime = 0
-        } catch (e) { /* ignore */ }
-        if (currentAudio._objectUrl) URL.revokeObjectURL(currentAudio._objectUrl)
-        currentAudio = null
-    }
-}
 const uploadedImage = ref(null)
-// 医疗设备中英文映射
-const categoryMap = {
-  'blood pressure set': '血压计',
-  'breast pump': '吸奶器',
-  'commode': '坐便椅',
-  'crutch': '拐杖',
-  'glucometer': '血糖仪',
-  'oximeter': '血氧仪',
-  'rippled mattress': '防褥疮床垫',
-  'therapeutic ultrasound machine': '治疗性超声设备',
-  'thermometer': '体温计',
-  'unknown': '无法识别'
-}
 const imageResult = ref(null)
 const imageClassifying = ref(false)
 const detectLoading = ref(false)
@@ -237,90 +298,18 @@ const scrollToBottom = async () => {
 watch(chatMessages, () => { scrollToBottom() }, { deep: true })
 
 const sendChat = async () => {
-  if (!currentSessionId.value) {
-    try {
-      const res = await createSession(userId.value)
-      if (res.code === 200) {
-        currentSessionId.value = res.msg
-        await loadSessions()
-      }
-    } catch (e) { console.error('create session failed', e); return }
-  }
+  if (!currentSessionId.value) { await handleNewSession(); if (!currentSessionId.value) return }
   if (!chatInput.value.trim()) return
   chatMessages.value.push({ role: 'user', content: chatInput.value, time: new Date().toLocaleTimeString() })
   const q = chatInput.value; chatInput.value = ''; chatLoading.value = true
-
-  // 用固定索引跟踪消息，splice 替换强制触发 Vue 更新
-  const msgIndex = chatMessages.value.length
-  chatMessages.value.push({ role: 'assistant', content: '', time: new Date().toLocaleTimeString() })
-
-  const streamStartTime = Date.now()
-  let streamBuffer = ''
-  let typeTimer = null
-  let streamDone = false
-
-  const startTypewriter = () => {
-    if (typeTimer) return
-    typeTimer = setInterval(() => {
-      if (streamBuffer.length === 0) {
-        if (streamDone) {
-          clearInterval(typeTimer)
-          typeTimer = null
-          finishStream()
-        }
-        return
-      }
-      // 每次取1-3个字符
-      const take = Math.min(3, streamBuffer.length)
-      const chars = streamBuffer.slice(0, take)
-      streamBuffer = streamBuffer.slice(take)
-      const msg = chatMessages.value[msgIndex]
-      if (msg) {
-        msg.content += chars
-        chatMessages.value.splice(msgIndex, 1, { ...msg })
-      }
-    }, 30)
+  try {
+    const res = await sendChatMessage(currentSessionId.value, q)
+    if (res.code === 200) chatMessages.value.push({ role: 'assistant', content: res.msg, time: new Date().toLocaleTimeString() })
+    else chatMessages.value.push({ role: 'assistant', content: '抱歉，AI 服务暂时不可用。', time: new Date().toLocaleTimeString() })
+  } catch (e) {
+    chatMessages.value.push({ role: 'assistant', content: 'AI 服务连接失败，请稍后重试。', time: new Date().toLocaleTimeString() })
   }
-
-  const finishStream = () => {
-    if (streamBuffer) {
-      const msg = chatMessages.value[msgIndex]
-      if (msg) {
-        msg.content += streamBuffer
-        streamBuffer = ''
-        chatMessages.value.splice(msgIndex, 1, { ...msg })
-      }
-    }
-    const elapsed = Date.now() - streamStartTime
-    console.log('[Chat] 流式对话完成，耗时:', elapsed, 'ms')
-    chatLoading.value = false
-    const msg = chatMessages.value[msgIndex]
-    if (msg && !msg.content) {
-      msg.content = '抱歉，AI 返回为空。'
-      chatMessages.value.splice(msgIndex, 1, { ...msg })
-    }
-  }
-
-  sendChatMessageStream(currentSessionId.value, q,
-    (chunk) => {
-      streamBuffer += chunk
-      startTypewriter()
-    },
-    () => {
-      streamDone = true
-    },
-    (err) => {
-      if (typeTimer) { clearInterval(typeTimer); typeTimer = null }
-      streamBuffer = ''
-      streamDone = true
-      chatLoading.value = false
-      const msg = chatMessages.value[msgIndex]
-      if (msg) {
-        msg.content = 'AI 服务连接失败：' + err
-        chatMessages.value.splice(msgIndex, 1, { ...msg })
-      }
-    }
-  )
+  chatLoading.value = false
 }
 
 const clearChat = () => { chatMessages.value = [{ role: 'assistant', content: '你好！我是数据分析助手，有什么可以帮你？', time: new Date().toLocaleTimeString() }] }
@@ -332,15 +321,7 @@ const loadSessions = async () => {
 const handleNewSession = async () => {
   try {
     const res = await createSession(userId.value)
-    if (res.code === 200) {
-      currentSessionId.value = res.msg
-      // 重置聊天区域
-      chatMessages.value = [{ role: 'assistant', content: '你好！我是数据分析助手，有什么可以帮你？', time: new Date().toLocaleTimeString() }]
-      // 重新加载会话列表并选中新会话
-      await loadSessions()
-      // 滚动到底部
-      scrollToBottom()
-    }
+    if (res.code === 200) { currentSessionId.value = res.data; chatMessages.value = [{ role: 'assistant', content: '你好！我是数据分析助手，有什么可以帮你？', time: new Date().toLocaleTimeString() }]; await loadSessions() }
   } catch (e) { console.error('创建会话失败', e) }
 }
 
@@ -358,20 +339,8 @@ const switchSession = async (sessionId) => {
 const handleDeleteSession = async (sessionId) => {
   try {
     await deleteSession(sessionId)
-    if (currentSessionId.value === sessionId) {
-      currentSessionId.value = ''
-      // 重新加载会话列表
-      await loadSessions()
-      // 如果有其他会话，自动选择最后一个
-      if (sessionList.value.length > 0) {
-        await switchSession(sessionList.value[sessionList.value.length - 1].id)
-      } else {
-        // 没有会话了，重置聊天区域
-        chatMessages.value = [{ role: 'assistant', content: '你好！我是数据分析助手，有什么可以帮你？', time: new Date().toLocaleTimeString() }]
-      }
-    } else {
-      await loadSessions()
-    }
+    if (currentSessionId.value === sessionId) { currentSessionId.value = ''; chatMessages.value = [{ role: 'assistant', content: '你好！我是数据分析助手，有什么可以帮你？', time: new Date().toLocaleTimeString() }] }
+    await loadSessions()
   } catch (e) { console.error('删除会话失败', e) }
 }
 
@@ -381,12 +350,7 @@ const asrSpeaking = ref(false)
 const processAsrResult = async (text) => {
   if (!text || text === '暂无识别结果') { asrQueryLoading.value = false; return }
   asrResult.value = text
-  if (!currentSessionId.value) {
-    try {
-      const cres = await createSession(userId.value)
-      if (cres.code === 200) { currentSessionId.value = cres.msg; await loadSessions() }
-    } catch (e) { console.error('create session failed', e); asrQueryLoading.value = false; return }
-  }
+  if (!currentSessionId.value) { await handleNewSession(); if (!currentSessionId.value) { asrQueryLoading.value = false; return } }
   try {
     const res = await sendChatMessage(currentSessionId.value, text)
     if (res.code === 200) { asrQueryResult.value = res.msg }
@@ -436,142 +400,186 @@ const handleFileUpload = (file) => {
 const speakAsrResult = async () => {
   if (!asrQueryResult.value) { ElMessage.warning('没有可播报的内容'); return }
   asrSpeaking.value = true
-  stopCurrentAudio()
   try {
     const res = await textToSpeech(asrQueryResult.value)
     if (res instanceof Blob) {
-      playBlobAudio(res, () => { asrSpeaking.value = false }, () => { asrSpeaking.value = false; ElMessage.error('播放失败') })
+      const url = URL.createObjectURL(res); const audio = new Audio(url)
+      audio.onended = () => { asrSpeaking.value = false; URL.revokeObjectURL(url) }
+      audio.onerror = () => { asrSpeaking.value = false; URL.revokeObjectURL(url); ElMessage.error('播放失败') }
+      audio.play()
     } else { ElMessage.error('语音合成失败'); asrSpeaking.value = false }
   } catch (e) { ElMessage.error('语音合成服务连接失败'); asrSpeaking.value = false }
 }
 
-const stopAsrSpeak = () => { stopCurrentAudio(); asrSpeaking.value = false }
+const stopAsrSpeak = () => { window.speechSynthesis?.cancel(); asrSpeaking.value = false }
 
-const generateReportContent = async () => {
-  // Phase 1: 从后端拉取真实数据拼装的报告文本
-  ttsReportLoading.value = true
-  ttsReportContent.value = '正在加载报告...'
-  try {
-    const res = await getReportText(ttsReportType.value)
-    if (res.code === 200 && res.data) {
-      ttsReportContent.value = res.data.text || ''
-    } else {
-      ttsReportContent.value = ''
-      ElMessage.error(res.msg || '报告加载失败')
-    }
-  } catch (e) {
-    ttsReportContent.value = ''
-    ElMessage.error('报告服务连接失败: ' + (e.message || '未知错误'))
-  } finally {
-    ttsReportLoading.value = false
+const generateReportContent = () => {
+  const now = new Date(); const ds = now.toLocaleDateString('zh-CN')
+  switch (ttsReportType.value) {
+    case 'bed': ttsReportContent.value = '【' + ds + ' 床位统计报告】\n全市医疗卫生机构床位总数 1655 张，其中公立医院 1200 张，基层医疗机构 455 张。\n床位使用率 78.5%，较上月提升 2.3 个百分点。\n建议：加强基层医疗资源配置，适当增加康复护理床位。'; break
+    case 'cost': ttsReportContent.value = '【' + ds + ' 费用统计报告】\n本周期医疗费用总额约 4253 万元，门诊次均费用 285 元，住院次均费用 6280 元。\n医保基金支出占比 65.2%，个人自付比例 22.8%。\n建议：关注药品费用增长趋势，优化控费措施。'; break
+    case 'service': ttsReportContent.value = '【' + ds + ' 服务量统计报告】\n本周期医疗卫生服务总量约 50000 人次，其中门诊服务 38000 人次，住院服务 12000 人次。\n基层首诊比例 42.3%，同比增长 5.1 个百分点。\n建议：持续推进分级诊疗制度，提升基层服务能力。'; break
   }
 }
 
 const speakReport = async () => {
-  if (!ttsReportContent.value || ttsReportContent.value === '正在加载报告...') {
-    ElMessage.warning('请先生成报告内容'); return
-  }
+  if (!ttsReportContent.value) { ElMessage.warning('请先生成报告内容'); return }
   ttsSpeaking.value = true
-  stopCurrentAudio()
-  // Phase 1: 走 /algorithm/tts/report，服务端拼装真实数据
   try {
-    const blob = await ttsReport(ttsReportType.value)
-    if (blob instanceof Blob) {
-      playBlobAudio(blob,
-        () => { ttsSpeaking.value = false },
-        () => { ttsSpeaking.value = false; ElMessage.error('播放失败') })
+    const res = await textToSpeech(ttsReportContent.value)
+    if (res instanceof Blob) {
+      const url = URL.createObjectURL(res); const audio = new Audio(url)
+      audio.onended = () => { ttsSpeaking.value = false; URL.revokeObjectURL(url) }
+      audio.onerror = () => { ttsSpeaking.value = false; URL.revokeObjectURL(url); ElMessage.error('播放失败') }
+      audio.play()
     } else { ElMessage.error('语音合成失败'); ttsSpeaking.value = false }
-  } catch (e) {
-    ElMessage.error('语音合成服务连接失败: ' + (e.message || '未知错误'))
-    ttsSpeaking.value = false
-  }
+  } catch (e) { ElMessage.error('语音合成服务连接失败'); ttsSpeaking.value = false }
 }
 
-const stopSpeak = () => { stopCurrentAudio(); ttsSpeaking.value = false }
+const stopSpeak = () => { window.speechSynthesis?.cancel(); ttsSpeaking.value = false }
 
-// Phase 2: 统一的 blob 音频播放函数
-const playBlobAudio = (blob, onEnded, onError) => {
-  const url = URL.createObjectURL(blob)
-  const audio = new Audio(url)
-  audio._objectUrl = url
-  audio.onended = () => { URL.revokeObjectURL(url); if (currentAudio === audio) currentAudio = null; onEnded && onEnded() }
-  audio.onerror = () => { URL.revokeObjectURL(url); if (currentAudio === audio) currentAudio = null; onError && onError() }
-  currentAudio = audio
-  audio.play().catch(e => { onError && onError(e) })
-}
-
-const handleImageUpload = async (file) => {
-  uploadedImage.value = URL.createObjectURL(file)
-  imageClassifying.value = true
-  imageResult.value = null
-  try {
-    const res = await imageClassify(file)
-    if (res.code === 200) {
-      imageResult.value = res.data
-    } else {
-      ElMessage.error(res.msg || '分类失败')
-    }
-  } catch (e) {
-    ElMessage.error('分类请求异常: ' + (e.message || '未知错误'))
-  } finally {
-    imageClassifying.value = false
-  }
-  return false
-}
+const handleImageUpload = (file) => { ElMessage.info('图像分类功能待后续更新'); return false }
 const clearImage = () => { uploadedImage.value = null; imageResult.value = null }
-// ==================== 骨骼分类 ====================
-const boneUploadedImage = ref(null)
-const boneClassifying = ref(false)
-const boneResult = ref(null)
-
-const handleBoneUpload = async (file) => {
-  boneUploadedImage.value = URL.createObjectURL(file)
-  boneClassifying.value = true
-  boneResult.value = null
-  try {
-    const res = await boneClassify(file)
-    if (res.code === 200) {
-      boneResult.value = res.data
-    } else {
-      ElMessage.error(res.msg || '骨骼分类失败')
-    }
-  } catch (e) {
-    ElMessage.error('骨骼分类请求异常: ' + (e.message || '未知错误'))
-  } finally {
-    boneClassifying.value = false
-  }
-  return false
-}
-const clearBoneImage = () => { boneUploadedImage.value = null; boneResult.value = null }
-
-const runDetection = async () => {
-  detectLoading.value = true
-  anomalyList.value = []
-  anomalyStats.value = { total: 0, costAnomaly: 0, visitAnomaly: 0 }
-  try {
-    const res = await runAnomalyDetection()
-    if (res.code === 200) {
-      anomalyList.value = res.data?.list || []
-      anomalyStats.value = res.data?.stats || { total: 0, costAnomaly: 0, visitAnomaly: 0 }
-    } else {
-      ElMessage.error(res.msg || '异常检测失败')
-    }
-  } catch (e) {
-    ElMessage.error('异常检测请求异常: ' + (e.message || '未知错误'))
-  } finally {
-    detectLoading.value = false
-  }
-}
+const runDetection = () => { ElMessage.info('异常检测功能待后续更新') }
 const viewDetail = (row) => { ElMessage.info('异常检测功能待后续更新') }
+  // 肺炎分类
+  const boneResult = ref(null)
+  const boneLoading = ref(false)
+  const bonePreviewUrl = ref(null)
 
+  // 处理上传（阻止自动上传，只做预览）
+  const handleBoneUpload = (file) => {
+    // 生成预览 URL
+    bonePreviewUrl.value = URL.createObjectURL(file)
+    // 调用上传分析
+    uploadBoneImage(file)
+    return false // 阻止自动上传
+  }
+
+  // 上传并分析
+  const uploadBoneImage = async (file) => {
+    boneLoading.value = true
+    boneResult.value = null
+
+    const formData = new FormData()
+    formData.append('image', file)
+
+    try {
+      const token = getToken()
+      const res = await axios.post('http://localhost:8081/ai/classify-bone', formData, {
+        headers: {
+          'Authorization': 'Bearer ' + token
+        }
+      })
+      boneResult.value = res.data
+    } catch (err) {
+      console.error('肺炎分类失败', err)
+      ElMessage.error('上传失败：' + (err.response?.data?.msg || err.message))
+    } finally {
+      boneLoading.value = false
+    }
+  }
 onMounted(async () => {
   await loadSessions()
-  if (sessionList.value.length > 0) await switchSession(sessionList.value[sessionList.value.length - 1].id)
-  await generateReportContent()
+  if (sessionList.value.length > 0) await switchSession(sessionList.value[0].id)
+  else await handleNewSession()
+  generateReportContent()
 })
 </script>
 
 <style scoped>
+.bone-container {
+  padding: 20px;
+  background: #f5f7fa;
+  min-height: 500px;
+}
+
+.bone-card {
+  max-width: 700px;
+  margin: 0 auto;
+  border-radius: 12px;
+}
+
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.bone-upload {
+  margin: 20px 0;
+}
+
+.bone-preview {
+  margin: 20px 0;
+  text-align: center;
+}
+
+.preview-title {
+  font-size: 14px;
+  color: #606266;
+  margin-bottom: 10px;
+}
+
+.preview-img {
+  max-height: 300px;
+  overflow: hidden;
+  border-radius: 8px;
+  background: #f5f7fa;
+}
+
+.preview-img .el-image {
+  width: 100%;
+  max-height: 280px;
+}
+
+.bone-result {
+  margin-top: 20px;
+}
+
+.result-header {
+  font-size: 14px;
+  font-weight: 600;
+  color: #303133;
+  margin-bottom: 16px;
+}
+
+.result-content {
+  background: #f5f7fa;
+  border-radius: 8px;
+  padding: 16px;
+}
+
+.result-item {
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+}
+
+.result-item .label {
+  width: 80px;
+  font-weight: 500;
+  color: #606266;
+}
+
+.result-item .el-progress {
+  flex: 1;
+  max-width: 300px;
+}
+
+.bone-loading {
+  text-align: center;
+  padding: 40px;
+  color: #409eff;
+}
+
+.bone-loading .el-icon {
+  font-size: 32px;
+  margin-bottom: 10px;
+  display: block;
+}
 .page-container { padding: 20px; }
 .ai-header { margin-bottom: 24px; }
 .ai-header h2 { margin: 0 0 8px; }
@@ -630,20 +638,8 @@ onMounted(async () => {
 .image-preview { position: relative; margin-top: 20px; text-align: center; }
 .image-preview img { max-width: 100%; max-height: 300px; border-radius: 8px; }
 .clear-btn { position: absolute; top: 8px; right: 8px; }
-.result-loading { min-height: 200px; display: flex; align-items: center; justify-content: center; }
-.result-header { text-align: center; padding: 10px 0 16px; }
-.result-tag { font-size: 18px; padding: 8px 24px; }
-.result-conf { display: block; font-size: 28px; font-weight: 700; color: #67c23a; margin-top: 8px; }
-.result-desc { font-size: 13px; color: #606266; line-height: 1.6; padding: 10px 0 16px; border-bottom: 1px solid #eee; margin-bottom: 12px; }
-.ranking-title { font-size: 14px; font-weight: 600; color: #303133; margin-bottom: 10px; }
-.ranking-list { display: flex; flex-direction: column; gap: 8px; }
-.ranking-item { display: flex; align-items: center; gap: 10px; padding: 6px 10px; border-radius: 8px; background: #f5f7fa; }
-.ranking-item.active { background: #e6f7e6; }
-.ranking-index { width: 18px; height: 18px; border-radius: 50%; background: #dcdfe6; color: #fff; font-size: 11px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-.ranking-item.active .ranking-index { background: #67c23a; }
-.ranking-name { font-size: 13px; color: #303133; width: 120px; flex-shrink: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.ranking-item .el-progress { flex: 1; min-width: 0; }
-.ranking-conf { font-size: 12px; color: #909399; width: 45px; text-align: right; flex-shrink: 0; }
+.image-result > div { margin-bottom: 12px; }
+.image-result .label { font-weight: 600; color: #606266; margin-right: 8px; }
 
 .detection-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
 .detection-title { font-size: 18px; font-weight: 600; }
@@ -652,15 +648,3 @@ onMounted(async () => {
 .detection-stats .stat-value { font-size: 32px; font-weight: bold; }
 .detection-stats .stat-label { font-size: 14px; opacity: 0.85; margin-top: 4px; }
 </style>
-
-
-
-
-
-
-
-
-
-
-
-
